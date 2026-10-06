@@ -33,6 +33,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     ensureSession();
 
+    // Keeps userId current after sign-out (account deletion) and a new anonymous sign-in.
+    const { data: authSub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!cancelled && session) setState({ userId: session.user.id, error: null });
+    });
+
     // Only refresh tokens while the app is in the foreground.
     const appStateSub = AppState.addEventListener('change', (status) => {
       if (status === 'active') supabase.auth.startAutoRefresh();
@@ -43,6 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
       appStateSub.remove();
+      authSub.subscription.unsubscribe();
       supabase.auth.stopAutoRefresh();
     };
   }, []);

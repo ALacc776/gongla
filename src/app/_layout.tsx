@@ -1,29 +1,43 @@
-import { Tabs } from 'expo-router';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
 import { AuthProvider } from '@/lib/auth';
+import { PrefsSync } from '@/lib/prefs-sync';
 import { colors } from '@/lib/theme';
+
+const queryClient = new QueryClient();
+
+const withHeader = (title: string) => ({
+  headerShown: true,
+  title,
+  headerBackTitle: 'Back',
+  headerTintColor: colors.accent,
+  headerTitleStyle: { color: colors.text },
+  headerStyle: { backgroundColor: colors.background },
+  headerShadowVisible: false,
+});
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <StatusBar style="dark" />
-      <Tabs
-        screenOptions={{
-          tabBarActiveTintColor: colors.accent,
-          tabBarInactiveTintColor: colors.muted,
-          tabBarLabelStyle: { fontSize: 14, fontWeight: '600' },
-          tabBarIconStyle: { display: 'none' },
-          tabBarStyle: { backgroundColor: colors.background, borderTopColor: colors.border },
-          headerStyle: { backgroundColor: colors.background },
-          headerShadowVisible: false,
-          headerTitleStyle: { color: colors.text },
-          sceneStyle: { backgroundColor: colors.background },
-        }}>
-        <Tabs.Screen name="index" options={{ title: 'Practice' }} />
-        <Tabs.Screen name="word-bank" options={{ title: 'Word Bank' }} />
-        <Tabs.Screen name="settings" options={{ title: 'Settings' }} />
-      </Tabs>
-    </AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <PrefsSync />
+        <StatusBar style="dark" />
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: colors.background },
+          }}>
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="chat" />
+          <Stack.Screen name="summary" options={{ gestureEnabled: false }} />
+          <Stack.Screen name="past-chats" options={withHeader('Past chats')} />
+          <Stack.Screen name="memory" options={withHeader('What the app remembers')} />
+          <Stack.Screen name="rehearse" options={withHeader('Rehearse')} />
+          <Stack.Screen name="welcome" options={{ gestureEnabled: false, animation: 'fade' }} />
+        </Stack>
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }
