@@ -1,24 +1,24 @@
-import { Tabs } from 'expo-router';
+import { NativeTabs } from 'expo-router/unstable-native-tabs';
 
 import { colors } from '@/lib/theme';
 
 export default function TabsLayout() {
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: colors.accent,
-        tabBarInactiveTintColor: colors.muted,
-        tabBarLabelStyle: { fontSize: 14, fontWeight: '600' },
-        tabBarIconStyle: { display: 'none' },
-        tabBarStyle: { backgroundColor: colors.background, borderTopColor: colors.border },
-        headerStyle: { backgroundColor: colors.background },
-        headerShadowVisible: false,
-        headerTitleStyle: { color: colors.text },
-        sceneStyle: { backgroundColor: colors.background },
-      }}>
-      <Tabs.Screen name="index" options={{ title: 'Practice' }} />
-      <Tabs.Screen name="word-bank" options={{ title: 'Word Bank' }} />
-      <Tabs.Screen name="settings" options={{ title: 'Settings' }} />
-    </Tabs>
+    <NativeTabs tintColor={colors.accent} minimizeBehavior="onScrollDown">
+      <NativeTabs.Trigger name="(practice)">
+        <NativeTabs.Trigger.Icon
+          sf={{ default: 'bubble.left.and.bubble.right', selected: 'bubble.left.and.bubble.right.fill' }}
+        />
+        <NativeTabs.Trigger.Label>Practice</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="word-bank">
+        <NativeTabs.Trigger.Icon sf={{ default: 'character.book.closed.zh', selected: 'character.book.closed.fill.zh' }} />
+        <NativeTabs.Trigger.Label>Word Bank</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="settings">
+        <NativeTabs.Trigger.Icon sf={{ default: 'gearshape', selected: 'gearshape.fill' }} />
+        <NativeTabs.Trigger.Label>Settings</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+    </NativeTabs>
   );
 }

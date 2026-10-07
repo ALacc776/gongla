@@ -9,7 +9,9 @@ import {
 } from 'expo-audio';
 import { File } from 'expo-file-system';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Pressable, StyleSheet, View } from 'react-native';
+
+import { Icon } from '@/components/ui';
 
 import { transcribe } from '@/lib/api';
 import { setRecordReady, stopPlayback } from '@/lib/audio';
@@ -191,23 +193,40 @@ export function MicButton({ disabled, hidden, onTranscript, onListeningChange }:
     else stopWhenReady.current = true; // let go before it was ready
   }
 
+  // How loud the mic is hearing you: -60 dB (nothing) to 0 dB (very loud).
+  const loudness = Math.max(0, Math.min(1, (level + 60) / 60));
+  const recording = ui === 'recording';
+  const halo = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(halo, { toValue: recording ? loudness : 0, duration: 120, useNativeDriver: true }).start();
+  }, [halo, loudness, recording]);
+
   return (
     <Pressable
       disabled={disabled || ui === 'stopping'}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
-      style={[styles.button, ui === 'recording' && styles.recording, disabled && styles.disabled, hidden && styles.hidden]}
-      accessibilityLabel={ui === 'recording' ? 'Stop and send' : 'Hold or tap to talk'}>
-      {ui === 'stopping' ? (
-        <ActivityIndicator color="#FFFFFF" />
-      ) : (
-        // "…" while the mic gets ready: start speaking when it turns ●.
-        <Text style={styles.label}>{ui === 'recording' ? '●' : ui === 'starting' ? '…' : '🎙'}</Text>
-      )}
-      {ui === 'recording' && (
-        // How loud the mic is hearing you: -60 dB (nothing) to 0 dB (very loud).
-        <View style={[styles.level, { height: `${Math.max(0, Math.min(1, (level + 60) / 60)) * 100}%` }]} />
-      )}
+      style={[styles.wrap, disabled && styles.disabled, hidden && styles.hidden]}
+      accessibilityRole="button"
+      accessibilityLabel={recording ? 'Stop and send' : 'Hold or tap to talk'}>
+      {/* The halo breathes with your voice while recording. */}
+      <Animated.View
+        style={[
+          styles.halo,
+          {
+            opacity: recording ? 0.25 : 0,
+            transform: [{ scale: halo.interpolate({ inputRange: [0, 1], outputRange: [1, 1.5] }) }],
+          },
+        ]}
+      />
+      <View style={[styles.button, recording && styles.recording]}>
+        {ui === 'stopping' || ui === 'starting' ? (
+          // Wait for red before speaking: the mic is still getting ready.
+          <ActivityIndicator color={colors.onAccent} />
+        ) : (
+          <Icon name={recording ? 'waveform' : 'mic.fill'} size={20} color={colors.onAccent} weight="semibold" />
+        )}
+      </View>
     </Pressable>
   );
 }
@@ -215,9 +234,9 @@ export function MicButton({ disabled, hidden, onTranscript, onListeningChange }:
 // Why nothing was recognised, from what the server measured in the recording.
 function emptyReason({ status, seconds, peak }: { status: string; seconds: number; peak: number }) {
   if (peak < 0.01) {
-    return 'The recording was silent. Check that Expo Go is allowed to use the microphone (iPhone Settings → Expo Go), and start speaking once the button turns ●.';
+    return 'The recording was silent. Check that Expo Go is allowed to use the microphone (iPhone Settings → Expo Go), and start speaking once the button turns red.';
   }
-  if (seconds < 1) return 'That was very short. Start speaking once the button turns ●, and let go when you finish.';
+  if (seconds < 1) return 'That was very short. Start speaking once the button turns red, and let go when you finish.';
   if (peak < 0.1 || status === 'InitialSilenceTimeout') {
     return 'It was very quiet. Hold the phone closer and speak up a little.';
   }
@@ -225,18 +244,17 @@ function emptyReason({ status, seconds, peak }: { status: string; seconds: numbe
 }
 
 const styles = StyleSheet.create({
+  wrap: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   button: {
-    width: 64,
+    width: 44,
     height: 44,
-    borderRadius: 12,
+    borderRadius: 22,
     backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
   },
-  recording: { transform: [{ scale: 1.15 }], backgroundColor: '#A12A22' },
-  disabled: { opacity: 0.4 },
+  recording: { backgroundColor: colors.destructive },
+  halo: { position: 'absolute', width: 44, height: 44, borderRadius: 22, backgroundColor: colors.destructive },
+  disabled: { opacity: 0.35 },
   hidden: { display: 'none' },
-  label: { fontSize: 20, color: '#FFFFFF' },
-  level: { position: 'absolute', left: 0, bottom: 0, width: 6, backgroundColor: '#FFFFFF', opacity: 0.8, borderRadius: 3 },
 });

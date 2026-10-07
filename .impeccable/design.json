@@ -1,0 +1,519 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-07T14:27:23.707966+00:00",
+  "title": "Design System: Gong",
+  "extensions": {
+    "colorMeta": {
+      "system-blue": {
+        "role": "primary",
+        "displayName": "System Blue",
+        "canonical": "PlatformColor('systemBlue')",
+        "light": "#007AFF",
+        "dark": "#0A84FF",
+        "tonalRamp": [
+          "#00254C",
+          "#003F85",
+          "#005ABD",
+          "#0075F5",
+          "#3395FF",
+          "#70B5FF",
+          "#ADD4FF",
+          "#E5F2FF"
+        ]
+      },
+      "system-blue-soft": {
+        "role": "primary",
+        "displayName": "System Blue Soft",
+        "canonical": "DynamicColorIOS({light:'rgba(0,122,255,0.12)',dark:'rgba(10,132,255,0.24)'})",
+        "light": "rgba(0,122,255,0.12)",
+        "dark": "rgba(10,132,255,0.24)",
+        "tonalRamp": [
+          "#00254C",
+          "#003F85",
+          "#005ABD",
+          "#0075F5",
+          "#3395FF",
+          "#70B5FF",
+          "#ADD4FF",
+          "#E5F2FF"
+        ]
+      },
+      "on-accent": {
+        "role": "primary",
+        "displayName": "On Accent",
+        "canonical": "#FFFFFF",
+        "light": "#FFFFFF",
+        "dark": "#FFFFFF",
+        "tonalRamp": [
+          "#252527",
+          "#414144",
+          "#5C5C60",
+          "#78787D",
+          "#97979B",
+          "#B6B6B9",
+          "#D5D5D7",
+          "#F2F2F3"
+        ]
+      },
+      "grouped-background": {
+        "role": "neutral",
+        "displayName": "Grouped Background",
+        "canonical": "PlatformColor('systemGroupedBackground')",
+        "light": "#F2F2F7",
+        "dark": "#000000",
+        "tonalRamp": [
+          "#252527",
+          "#414144",
+          "#5C5C60",
+          "#78787D",
+          "#97979B",
+          "#B6B6B9",
+          "#D5D5D7",
+          "#F2F2F3"
+        ]
+      },
+      "plain-background": {
+        "role": "neutral",
+        "displayName": "Plain Background",
+        "canonical": "PlatformColor('systemBackground')",
+        "light": "#FFFFFF",
+        "dark": "#000000",
+        "tonalRamp": [
+          "#252527",
+          "#414144",
+          "#5C5C60",
+          "#78787D",
+          "#97979B",
+          "#B6B6B9",
+          "#D5D5D7",
+          "#F2F2F3"
+        ]
+      },
+      "grouped-card": {
+        "role": "neutral",
+        "displayName": "Grouped Card",
+        "canonical": "PlatformColor('secondarySystemGroupedBackground')",
+        "light": "#FFFFFF",
+        "dark": "#1C1C1E",
+        "tonalRamp": [
+          "#252527",
+          "#414144",
+          "#5C5C60",
+          "#78787D",
+          "#97979B",
+          "#B6B6B9",
+          "#D5D5D7",
+          "#F2F2F3"
+        ]
+      },
+      "grouped-inset": {
+        "role": "neutral",
+        "displayName": "Grouped Inset",
+        "canonical": "PlatformColor('tertiarySystemGroupedBackground')",
+        "light": "#F2F2F7",
+        "dark": "#2C2C2E",
+        "tonalRamp": [
+          "#252527",
+          "#414144",
+          "#5C5C60",
+          "#78787D",
+          "#97979B",
+          "#B6B6B9",
+          "#D5D5D7",
+          "#F2F2F3"
+        ]
+      },
+      "label": {
+        "role": "neutral",
+        "displayName": "Label",
+        "canonical": "PlatformColor('label')",
+        "light": "#000000",
+        "dark": "#FFFFFF",
+        "tonalRamp": [
+          "#252527",
+          "#414144",
+          "#5C5C60",
+          "#78787D",
+          "#97979B",
+          "#B6B6B9",
+          "#D5D5D7",
+          "#F2F2F3"
+        ]
+      },
+      "secondary-label": {
+        "role": "neutral",
+        "displayName": "Secondary Label",
+        "canonical": "PlatformColor('secondaryLabel')",
+        "light": "rgba(60,60,67,0.6)",
+        "dark": "rgba(235,235,245,0.6)",
+        "tonalRamp": [
+          "#252527",
+          "#414144",
+          "#5C5C60",
+          "#78787D",
+          "#97979B",
+          "#B6B6B9",
+          "#D5D5D7",
+          "#F2F2F3"
+        ]
+      },
+      "tertiary-label": {
+        "role": "neutral",
+        "displayName": "Tertiary Label",
+        "canonical": "PlatformColor('tertiaryLabel')",
+        "light": "rgba(60,60,67,0.3)",
+        "dark": "rgba(235,235,245,0.3)",
+        "tonalRamp": [
+          "#252527",
+          "#414144",
+          "#5C5C60",
+          "#78787D",
+          "#97979B",
+          "#B6B6B9",
+          "#D5D5D7",
+          "#F2F2F3"
+        ]
+      },
+      "placeholder-text": {
+        "role": "neutral",
+        "displayName": "Placeholder Text",
+        "canonical": "PlatformColor('placeholderText')",
+        "light": "rgba(60,60,67,0.3)",
+        "dark": "rgba(235,235,245,0.3)",
+        "tonalRamp": [
+          "#252527",
+          "#414144",
+          "#5C5C60",
+          "#78787D",
+          "#97979B",
+          "#B6B6B9",
+          "#D5D5D7",
+          "#F2F2F3"
+        ]
+      },
+      "separator": {
+        "role": "neutral",
+        "displayName": "Separator",
+        "canonical": "PlatformColor('separator')",
+        "light": "rgba(60,60,67,0.29)",
+        "dark": "rgba(84,84,88,0.6)",
+        "tonalRamp": [
+          "#252527",
+          "#414144",
+          "#5C5C60",
+          "#78787D",
+          "#97979B",
+          "#B6B6B9",
+          "#D5D5D7",
+          "#F2F2F3"
+        ]
+      },
+      "tertiary-fill": {
+        "role": "neutral",
+        "displayName": "Tertiary Fill",
+        "canonical": "PlatformColor('tertiarySystemFill')",
+        "light": "rgba(118,118,128,0.12)",
+        "dark": "rgba(118,118,128,0.24)",
+        "tonalRamp": [
+          "#252527",
+          "#414144",
+          "#5C5C60",
+          "#78787D",
+          "#97979B",
+          "#B6B6B9",
+          "#D5D5D7",
+          "#F2F2F3"
+        ]
+      },
+      "secondary-fill": {
+        "role": "neutral",
+        "displayName": "Secondary Fill",
+        "canonical": "PlatformColor('secondarySystemFill')",
+        "light": "rgba(120,120,128,0.16)",
+        "dark": "rgba(120,120,128,0.32)",
+        "tonalRamp": [
+          "#252527",
+          "#414144",
+          "#5C5C60",
+          "#78787D",
+          "#97979B",
+          "#B6B6B9",
+          "#D5D5D7",
+          "#F2F2F3"
+        ]
+      },
+      "pressed-highlight": {
+        "role": "neutral",
+        "displayName": "Pressed Highlight",
+        "canonical": "PlatformColor('systemGray4')",
+        "light": "#D1D1D6",
+        "dark": "#3A3A3C",
+        "tonalRamp": [
+          "#252527",
+          "#414144",
+          "#5C5C60",
+          "#78787D",
+          "#97979B",
+          "#B6B6B9",
+          "#D5D5D7",
+          "#F2F2F3"
+        ]
+      },
+      "received-bubble": {
+        "role": "neutral",
+        "displayName": "Received Bubble",
+        "canonical": "DynamicColorIOS({light:'#E9E9EB',dark:'#262629'})",
+        "light": "#E9E9EB",
+        "dark": "#262629",
+        "tonalRamp": [
+          "#252527",
+          "#414144",
+          "#5C5C60",
+          "#78787D",
+          "#97979B",
+          "#B6B6B9",
+          "#D5D5D7",
+          "#F2F2F3"
+        ]
+      },
+      "system-green": {
+        "role": "state",
+        "displayName": "System Green",
+        "canonical": "PlatformColor('systemGreen')",
+        "light": "#34C759",
+        "dark": "#30D158",
+        "tonalRamp": [
+          "#103D1B",
+          "#1B692F",
+          "#279643",
+          "#33C257",
+          "#5DD57B",
+          "#8EE1A3",
+          "#BEEECA",
+          "#EBFAEF"
+        ]
+      },
+      "system-red": {
+        "role": "state",
+        "displayName": "System Red",
+        "canonical": "PlatformColor('systemRed')",
+        "light": "#FF3B30",
+        "dark": "#FF453A",
+        "tonalRamp": [
+          "#4C0400",
+          "#850700",
+          "#BD0A00",
+          "#F50D00",
+          "#FF3E33",
+          "#FF7870",
+          "#FFB2AD",
+          "#FFE7E5"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "large-title": {
+        "displayName": "Large Title",
+        "purpose": "Native large titles on tab roots."
+      },
+      "title1": {
+        "displayName": "Title1",
+        "purpose": "Occasional screen headings."
+      },
+      "title2": {
+        "displayName": "Title2",
+        "purpose": "Occasional screen headings."
+      },
+      "title3": {
+        "displayName": "Title3",
+        "purpose": "Prominent group headers and shelf titles."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Card and banner titles; button labels."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Row titles, values, inputs, answers."
+      },
+      "callout": {
+        "displayName": "Callout",
+        "purpose": "Defined iOS step; rarely used."
+      },
+      "subhead": {
+        "displayName": "Subhead",
+        "purpose": "Translations, secondary lines, toggle labels."
+      },
+      "footnote": {
+        "displayName": "Footnote",
+        "purpose": "Subtitles, Jyutping under notes, group headers and footers, errors."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Jyutping under each word in a bubble."
+      },
+      "hanzi": {
+        "displayName": "Hanzi",
+        "purpose": "The 22pt floor for all Chinese characters."
+      }
+    },
+    "shadows": [
+      {
+        "name": "segmented-thumb",
+        "value": "0 2px 4px rgba(0,0,0,0.12)",
+        "purpose": "Sliding thumb of the Segmented control only."
+      }
+    ],
+    "motion": [
+      {
+        "name": "press-fade",
+        "value": "opacity 0.6 while pressed",
+        "purpose": "Pressed state for buttons, icon buttons, toggles."
+      },
+      {
+        "name": "segmented-spring",
+        "value": "Animated.spring speed 20, bounciness 0",
+        "purpose": "Segmented thumb slide."
+      },
+      {
+        "name": "mic-halo",
+        "value": "Animated.timing 120ms, scale 1 to 1.5 by input level",
+        "purpose": "Recording halo behind the mic."
+      }
+    ],
+    "breakpoints": []
+  },
+  "components": [
+    {
+      "name": "Filled Button",
+      "kind": "button",
+      "refersTo": "button-filled",
+      "description": "The one main action on a screen.",
+      "html": "<button class=\"ds-btn-filled\">Start chat</button>",
+      "css": ".ds-btn-filled{font-family:-apple-system,'SF Pro Text',system-ui,sans-serif;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:50px;padding:0 20px;border:none;border-radius:999px;font-size:17px;font-weight:600;cursor:pointer;transition:opacity .15s;background:#007AFF;color:#FFFFFF;} .ds-btn-filled:active{opacity:.6;} .ds-btn-filled:focus-visible{outline:3px solid rgba(0,122,255,.4);outline-offset:2px;} .ds-btn-filled:disabled{opacity:.35;}"
+    },
+    {
+      "name": "Tinted Button",
+      "kind": "button",
+      "refersTo": "button-tinted",
+      "description": "Secondary actions on a neutral fill.",
+      "html": "<button class=\"ds-btn-tinted\">Past chats</button>",
+      "css": ".ds-btn-tinted{font-family:-apple-system,'SF Pro Text',system-ui,sans-serif;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:50px;padding:0 20px;border:none;border-radius:999px;font-size:17px;font-weight:600;cursor:pointer;transition:opacity .15s;background:rgba(118,118,128,0.12);color:#007AFF;} .ds-btn-tinted:active{opacity:.6;} .ds-btn-tinted:focus-visible{outline:3px solid rgba(0,122,255,.4);outline-offset:2px;}"
+    },
+    {
+      "name": "Plain Button",
+      "kind": "button",
+      "refersTo": "button-plain",
+      "description": "Text-only actions.",
+      "html": "<button class=\"ds-btn-plain\">Not now</button>",
+      "css": ".ds-btn-plain{font-family:-apple-system,'SF Pro Text',system-ui,sans-serif;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:50px;padding:0 20px;border:none;border-radius:999px;font-size:17px;font-weight:600;cursor:pointer;transition:opacity .15s;background:transparent;color:#007AFF;} .ds-btn-plain:active{opacity:.6;} .ds-btn-plain:focus-visible{outline:3px solid rgba(0,122,255,.4);outline-offset:2px;}"
+    },
+    {
+      "name": "Inset Grouped List",
+      "kind": "card",
+      "refersTo": "group-card",
+      "description": "Settings-style group with hairline inset separators.",
+      "html": "<div class=\"ds-group\"><div class=\"ds-group-h\">Voice</div><div class=\"ds-group-card\"><button class=\"ds-row\"><span class=\"ds-row-t\">Speaking speed</span><span class=\"ds-row-v\">Normal</span><svg width=\"8\" height=\"13\" viewBox=\"0 0 8 13\" aria-hidden=\"true\"><path d=\"M1.5 1.5l5 5-5 5\" stroke=\"rgba(60,60,67,0.3)\" stroke-width=\"2\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg></button><div class=\"ds-sep\"></div><button class=\"ds-row\"><span class=\"ds-row-t ds-row-action\">Test the voice</span></button></div><div class=\"ds-group-f\">Plays a short line in Cantonese.</div></div>",
+      "css": ".ds-group{font-family:-apple-system,'SF Pro Text',system-ui,sans-serif;background:#F2F2F7;padding:16px;} .ds-group-h{font-size:13px;line-height:18px;color:rgba(60,60,67,0.6);text-transform:uppercase;padding:0 16px 7px;} .ds-group-f{font-size:13px;line-height:18px;color:rgba(60,60,67,0.6);padding:7px 16px 0;} .ds-group-card{background:#FFFFFF;border-radius:14px;overflow:hidden;} .ds-row{display:flex;align-items:center;gap:12px;width:100%;min-height:44px;padding:11px 16px;border:none;background:transparent;font:inherit;text-align:left;cursor:pointer;} .ds-row:active{background:#D1D1D6;} .ds-row:focus-visible{outline:3px solid rgba(0,122,255,.4);outline-offset:-3px;} .ds-row-t{flex:1;font-size:17px;line-height:22px;color:#000;} .ds-row-action{color:#007AFF;} .ds-row-v{font-size:17px;color:rgba(60,60,67,0.6);} .ds-sep{height:.5px;background:rgba(60,60,67,0.29);margin-left:16px;}"
+    },
+    {
+      "name": "Message Bubbles",
+      "kind": "custom",
+      "refersTo": "bubble-received",
+      "description": "iMessage-style: gray received with per-word Jyutping, blue sent.",
+      "html": "<div class=\"ds-chat\"><div class=\"ds-bub-r\"><div class=\"ds-segs\"><span class=\"ds-seg\"><b>幾</b><i>gei2</i></span><span class=\"ds-seg ds-seg-on\"><b>位</b><i>wai6</i></span><span class=\"ds-seg\"><b>啦</b><i>laa1</i></span></div><div class=\"ds-bub-f\"><span>How many people?</span><button class=\"ds-spk\" aria-label=\"Play this line\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M4 9h4l5-4v14l-5-4H4z\"/><path d=\"M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11\" stroke=\"currentColor\" stroke-width=\"2\" fill=\"none\" stroke-linecap=\"round\"/></svg></button></div></div><div class=\"ds-bub-s\">兩位</div></div>",
+      "css": ".ds-chat{font-family:-apple-system,'SF Pro Text',system-ui,sans-serif;background:#FFFFFF;padding:16px;display:flex;flex-direction:column;gap:10px;} .ds-bub-r{align-self:flex-start;max-width:85%;background:#E9E9EB;border-radius:20px;padding:9px 14px;display:flex;flex-direction:column;gap:8px;} .ds-segs{display:flex;flex-wrap:wrap;gap:4px 2px;} .ds-seg{display:flex;flex-direction:column;align-items:center;border-radius:6px;padding:0 1px;cursor:pointer;} .ds-seg:hover,.ds-seg-on{background:rgba(0,122,255,0.12);} .ds-seg b{font-weight:400;font-size:24px;line-height:32px;color:#000;} .ds-seg i{font-style:normal;font-size:12px;line-height:16px;color:rgba(60,60,67,0.6);} .ds-bub-f{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;font-size:15px;line-height:20px;color:rgba(60,60,67,0.6);} .ds-spk{border:none;background:none;color:#007AFF;padding:0;cursor:pointer;} .ds-spk:active{opacity:.6;} .ds-spk:focus-visible{outline:2px solid rgba(0,122,255,.4);} .ds-bub-s{align-self:flex-end;max-width:85%;background:#007AFF;color:#FFFFFF;border-radius:20px;padding:9px 14px;font-size:22px;line-height:30px;}"
+    },
+    {
+      "name": "Capsule Toggle",
+      "kind": "chip",
+      "refersTo": "toggle-on",
+      "description": "On/off display options in the chat.",
+      "html": "<div class=\"ds-toggles\"><button class=\"ds-tog ds-tog-on\" role=\"switch\" aria-checked=\"true\">jyut</button><button class=\"ds-tog\" role=\"switch\" aria-checked=\"false\">EN</button></div>",
+      "css": ".ds-toggles{font-family:-apple-system,'SF Pro Text',system-ui,sans-serif;display:flex;gap:8px;} .ds-tog{display:inline-flex;align-items:center;gap:5px;height:32px;padding:0 12px;border:none;border-radius:16px;font-size:15px;font-weight:500;background:rgba(118,118,128,0.12);color:rgba(60,60,67,0.6);cursor:pointer;} .ds-tog-on{background:rgba(0,122,255,0.12);color:#007AFF;} .ds-tog:active{opacity:.6;} .ds-tog:focus-visible{outline:3px solid rgba(0,122,255,.4);outline-offset:2px;}"
+    },
+    {
+      "name": "Segmented Control",
+      "kind": "custom",
+      "refersTo": "segmented-track",
+      "description": "Hand-built UIKit-style single choice with a sliding thumb.",
+      "html": "<div class=\"ds-seg-ctl\" role=\"tablist\"><button role=\"tab\" aria-selected=\"false\">Level 1</button><button role=\"tab\" aria-selected=\"true\" class=\"ds-seg-sel\">Level 2</button><button role=\"tab\" aria-selected=\"false\">Level 3</button></div>",
+      "css": ".ds-seg-ctl{font-family:-apple-system,'SF Pro Text',system-ui,sans-serif;display:flex;height:32px;padding:2px;border-radius:9px;background:rgba(118,118,128,0.12);} .ds-seg-ctl button{flex:1;border:none;background:transparent;border-radius:7px;font-size:13px;font-weight:500;color:#000;cursor:pointer;transition:background .2s,box-shadow .2s;} .ds-seg-ctl .ds-seg-sel{background:#FFFFFF;font-weight:600;box-shadow:0 2px 4px rgba(0,0,0,0.12);} .ds-seg-ctl button:focus-visible{outline:2px solid rgba(0,122,255,.4);}"
+    },
+    {
+      "name": "Chat Composer",
+      "kind": "input",
+      "refersTo": "mic-button",
+      "description": "Capsule field at hanzi size with the Voice Memos-style mic.",
+      "html": "<div class=\"ds-comp\"><input class=\"ds-field\" placeholder=\"Reply any way you can\"><button class=\"ds-mic\" aria-label=\"Hold to talk\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"currentColor\" aria-hidden=\"true\"><rect x=\"9\" y=\"3\" width=\"6\" height=\"11\" rx=\"3\"/><path d=\"M6 11a6 6 0 0 0 12 0\" stroke=\"currentColor\" stroke-width=\"2\" fill=\"none\" stroke-linecap=\"round\"/><path d=\"M12 17v4\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/></svg></button><button class=\"ds-mic ds-mic-rec\" aria-label=\"Recording\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"currentColor\" aria-hidden=\"true\"><rect x=\"9\" y=\"3\" width=\"6\" height=\"11\" rx=\"3\"/><path d=\"M6 11a6 6 0 0 0 12 0\" stroke=\"currentColor\" stroke-width=\"2\" fill=\"none\" stroke-linecap=\"round\"/><path d=\"M12 17v4\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/></svg></button></div>",
+      "css": ".ds-comp{font-family:-apple-system,'SF Pro Text',system-ui,sans-serif;display:flex;align-items:flex-end;gap:6px;padding:8px;background:#FFFFFF;} .ds-field{flex:1;min-height:44px;box-sizing:border-box;border-radius:22px;border:1px solid rgba(60,60,67,0.29);padding:6px 8px 6px 16px;font-size:22px;line-height:30px;color:#000;background:#FFFFFF;} .ds-field::placeholder{color:rgba(60,60,67,0.3);} .ds-field:focus-visible{outline:none;border-color:#007AFF;} .ds-mic{width:44px;height:44px;border-radius:22px;border:none;background:#007AFF;color:#FFFFFF;display:flex;align-items:center;justify-content:center;cursor:pointer;} .ds-mic:active{opacity:.6;} .ds-mic:focus-visible{outline:3px solid rgba(0,122,255,.4);outline-offset:2px;} .ds-mic-rec{background:#FF3B30;box-shadow:0 0 0 8px rgba(255,59,48,0.35);transition:box-shadow .12s;}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The First-Party App",
+    "overview": "Gong looks like something Apple shipped in iOS: Settings-style inset grouped lists, Messages-style bubbles, Voice Memos' round record button, a native Liquid Glass tab bar and native large-title headers. Nothing is styled to be noticed. The system's job is to stay out of the way of the chat, which is the product, and to make Chinese text large and calm.\n\nEvery color is an iOS semantic color resolved at runtime through `PlatformColor` (with the hex values below as non-iOS fallbacks), so light mode, dark mode and Increase Contrast work without extra code. System Blue is the only tint. Depth comes from the system's grouped-background layering rather than shadows or borders. Icons are SF Symbols through `expo-symbols`, at a weight that matches the adjacent text.\n\nThe confirmed rejection is the look this replaced: one saturated red on every control, bordered cards everywhere, emoji standing in for icons.",
+    "keyCharacteristics": [
+      "iOS semantic colors only; System Blue as the single tint; green and red for state only.",
+      "Inset grouped lists with continuous-curve corners and hairline inset separators, no borders.",
+      "Capsule buttons in three variants: filled, tinted, plain.",
+      "iMessage bubbles: blue sent, gray received.",
+      "SF Symbols for every icon; character emoji appear only inside avatars.",
+      "Chinese characters never below 22pt."
+    ],
+    "rules": [
+      {
+        "name": "The One Tint Rule",
+        "body": "System Blue is the only accent. No second brand color, no per-scene colors.",
+        "section": "colors"
+      },
+      {
+        "name": "The State-Only Rule",
+        "body": "Green and red mean something happened (success, destruction, recording, error). They never decorate.",
+        "section": "colors"
+      },
+      {
+        "name": "The Semantic Source Rule",
+        "body": "Colors come from `colors` in `src/lib/theme.ts`, which resolves iOS semantic colors. Never hard-code a hex in a screen; the fallback hex exists only for non-iOS.",
+        "section": "colors"
+      },
+      {
+        "name": "The Frozen Header Rule",
+        "body": "Native headers and other native chrome take their colors from the React Navigation theme in `src/app/_layout.tsx` (light: #007AFF / #F2F2F7 / #FFFFFF / #000000; dark: #0A84FF / #000000 / #000000 / #FFFFFF), switched on `useColorScheme()`. `PlatformColor` values passed to native header options freeze at their light values, so header option objects carry no colors.",
+        "section": "colors"
+      },
+      {
+        "name": "The 22pt Floor Rule",
+        "body": "Chinese characters never render below 22pt, anywhere. Spread `hanzi` from the theme or go larger.",
+        "section": "typography"
+      },
+      {
+        "name": "The Text Style Rule",
+        "body": "Use the `type` scale from the theme; do not invent intermediate sizes for Latin text.",
+        "section": "typography"
+      },
+      {
+        "name": "The Layer-Not-Shadow Rule",
+        "body": "Separate surfaces by background level, never by drop shadows or borders.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do take every color from `colors` in `src/lib/theme.ts` so it follows light, dark and Increase Contrast.",
+      "Do set native header and navigation colors only through the light/dark navigation themes in `src/app/_layout.tsx`.",
+      "Do use System Blue for every interactive tint, and System Green / System Red only for success, destruction, errors and recording.",
+      "Do set Chinese characters at 22pt or larger, using `hanzi` from the theme or a larger size.",
+      "Do build list screens from `Group` and `Row`: inset grouped cards, 14pt continuous corners, hairline inset separators.",
+      "Do use `Button` capsules: filled for the one main action, tinted for secondary, plain for text actions.",
+      "Do use SF Symbols through `Icon` / `expo-symbols` for every icon, at a weight matching the adjacent text.",
+      "Do keep touch targets at 44pt or more."
+    ],
+    "donts": [
+      "Don't add a second accent color or per-scene colors.",
+      "Don't pass `PlatformColor` values to native header options; they freeze at light values.",
+      "Don't put borders around cards or drop shadows under surfaces; separate them by background level.",
+      "Don't use emoji or text glyphs as UI icons. Character emoji appear only inside `Avatar`, as scene content.",
+      "Don't add a UI dependency for controls the system or `ui.tsx` already covers (the Segmented control is hand-built for this reason).",
+      "Don't set Chinese text below 22pt in any context."
+    ]
+  }
+}

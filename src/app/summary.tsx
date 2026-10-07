@@ -1,13 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Button, Group, Icon, Row } from '@/components/ui';
 import { endSession, startSession } from '@/lib/api';
 import { useSpeaker, useVoiceSettings } from '@/lib/audio';
 import { useAuth } from '@/lib/auth';
 import { PROFILE_KEY, updateProfile } from '@/lib/profile';
-import { colors } from '@/lib/theme';
+import { colors, type } from '@/lib/theme';
 import type { GapInfo } from '@/lib/types';
 
 function percent(ratio: number | null) {
@@ -51,7 +52,7 @@ export default function SummaryScreen() {
   if (summary.isPending) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator color={colors.accent} />
+        <ActivityIndicator />
         <Text style={styles.muted}>Wrapping up…</Text>
       </View>
     );
@@ -60,9 +61,7 @@ export default function SummaryScreen() {
     return (
       <View style={styles.center}>
         <Text style={styles.error}>{summary.error.message}</Text>
-        <Pressable onPress={() => router.back()}>
-          <Text style={styles.link}>Back</Text>
-        </Pressable>
+        <Button title="Back" variant="plain" onPress={() => router.back()} />
       </View>
     );
   }
@@ -79,43 +78,54 @@ export default function SummaryScreen() {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}>
-      <Text style={styles.scenario}>{s.title}</Text>
-      <Text style={styles.big}>{percent(s.ratio)}</Text>
-      <Text style={styles.headline}>
-        {s.ratio === null ? 'No messages this time' : 'of what you said was Cantonese'}
-      </Text>
-      {trend && <Text style={styles.muted}>{trend}</Text>}
-      <Text style={styles.goal}>{s.goal_met ? '✓ Goal complete' : 'Goal not finished yet'}</Text>
+      contentContainerStyle={[styles.content, { paddingTop: insets.top + 32, paddingBottom: insets.bottom + 24 }]}>
+      <View style={styles.hero}>
+        <Text style={styles.scenario}>{s.title}</Text>
+        <Text style={styles.big}>{percent(s.ratio)}</Text>
+        <Text style={styles.headline}>
+          {s.ratio === null ? 'No messages this time' : 'of what you said was Cantonese'}
+        </Text>
+        {s.ratio !== null && (
+          <View style={styles.meter} accessibilityElementsHidden>
+            <View style={[styles.meterFill, { width: `${Math.round(s.ratio * 100)}%` }]} />
+          </View>
+        )}
+        {trend && <Text style={styles.muted}>{trend}</Text>}
+        <View style={styles.goal}>
+          <Icon
+            name={s.goal_met ? 'checkmark.circle.fill' : 'circle.dashed'}
+            size={18}
+            color={s.goal_met ? colors.success : colors.secondary}
+          />
+          <Text style={styles.goalText}>{s.goal_met ? 'Goal complete' : 'Goal not finished yet'}</Text>
+        </View>
+      </View>
 
       {suggestedLevel !== null && !changeLevel.isSuccess && (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>
-            {s.level_suggestion === 'up'
-              ? "You've been speaking mostly Cantonese. Try a harder level?"
-              : 'Want shorter, simpler replies for a while?'}
-          </Text>
-          <Pressable style={styles.smallButton} onPress={() => changeLevel.mutate(suggestedLevel)}>
-            <Text style={styles.smallButtonText}>Switch to level {suggestedLevel}</Text>
-          </Pressable>
-        </View>
+        <Group>
+          <View style={styles.suggest}>
+            <Text style={styles.suggestText}>
+              {s.level_suggestion === 'up'
+                ? "You've been speaking mostly Cantonese. Try a harder level?"
+                : 'Want shorter, simpler replies for a while?'}
+            </Text>
+            <Button
+              title={`Switch to level ${suggestedLevel}`}
+              size="small"
+              loading={changeLevel.isPending}
+              onPress={() => changeLevel.mutate(suggestedLevel)}
+            />
+          </View>
+        </Group>
       )}
-      {changeLevel.isSuccess && <Text style={styles.muted}>Level updated.</Text>}
+      {changeLevel.isSuccess && <Text style={[styles.muted, styles.centered]}>Level updated.</Text>}
 
       <GapSection title="You said these on your own" gaps={s.used_gaps} onPlay={speak} empty="None this time." />
       <GapSection title="New words to practise" gaps={s.new_gaps} onPlay={speak} empty="You didn't get stuck. Nice." />
 
       <View style={styles.buttons}>
-        <Pressable style={styles.button} disabled={again.isPending} onPress={() => again.mutate()}>
-          {again.isPending ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text style={styles.buttonText}>Practise again</Text>
-          )}
-        </Pressable>
-        <Pressable style={styles.secondary} onPress={() => router.dismissTo('/')}>
-          <Text style={styles.secondaryText}>Done</Text>
-        </Pressable>
+        <Button title="Practise again" loading={again.isPending} onPress={() => again.mutate()} />
+        <Button title="Done" variant="plain" onPress={() => router.dismissTo('/')} />
       </View>
       {again.isError && <Text style={styles.error}>{again.error.message}</Text>}
     </ScrollView>
@@ -133,66 +143,63 @@ function GapSection({
   empty: string;
   onPlay: (text: string) => void;
 }) {
+  if (gaps.length === 0) {
+    return (
+      <Group header={title}>
+        <Row>
+          <Text style={styles.muted}>{empty}</Text>
+        </Row>
+      </Group>
+    );
+  }
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {gaps.length === 0 && <Text style={styles.muted}>{empty}</Text>}
+    <Group header={title}>
       {gaps.map((g) => (
-        <Pressable key={g.id} style={styles.gapRow} onPress={() => onPlay(g.hanzi)}>
+        <Row key={g.id} onPress={() => onPlay(g.hanzi)} accessory={<Icon name="speaker.wave.2.fill" size={18} />}>
           <Text style={styles.gapHanzi}>{g.hanzi}</Text>
           <View style={styles.flex}>
-            <Text style={styles.gapJyutping}>{g.jyutping}</Text>
-            <Text style={styles.muted}>{g.english}</Text>
+            <Text style={styles.gapEnglish}>{g.english}</Text>
+            <Text style={styles.muted}>{g.jyutping}</Text>
           </View>
-          <Text style={styles.speaker}>🔊</Text>
-        </Pressable>
+        </Row>
       ))}
-    </View>
+    </Group>
   );
 }
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: { flex: 1, backgroundColor: colors.background },
-  content: { paddingHorizontal: 20, gap: 8 },
+  content: { gap: 28 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: colors.background },
-  scenario: { fontSize: 15, color: colors.muted, textAlign: 'center' },
-  big: { fontSize: 72, fontWeight: '700', color: colors.accent, textAlign: 'center' },
-  headline: { fontSize: 18, color: colors.text, textAlign: 'center' },
-  goal: { fontSize: 15, color: colors.text, textAlign: 'center', marginTop: 4 },
-  muted: { fontSize: 14, color: colors.muted },
-  card: {
-    marginTop: 16,
-    padding: 14,
-    borderRadius: 14,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.accentSoft,
-    gap: 10,
+  hero: { alignItems: 'center', gap: 6, paddingHorizontal: 24 },
+  scenario: { ...type.subhead, color: colors.secondary, textAlign: 'center' },
+  big: {
+    fontSize: 80,
+    lineHeight: 92,
+    fontWeight: '700',
+    color: colors.text,
+    fontVariant: ['tabular-nums'],
+    letterSpacing: -1,
   },
-  cardTitle: { fontSize: 15, color: colors.text },
-  smallButton: { alignSelf: 'flex-start', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, backgroundColor: colors.accent },
-  smallButtonText: { color: '#FFFFFF', fontWeight: '600' },
-  section: { marginTop: 24, gap: 8 },
-  sectionTitle: { fontSize: 17, fontWeight: '600', color: colors.text },
-  gapRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
+  headline: { ...type.title3, fontWeight: '400', color: colors.text, textAlign: 'center' },
+  meter: {
+    alignSelf: 'stretch',
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.fillStrong,
+    overflow: 'hidden',
+    marginVertical: 10,
   },
-  gapHanzi: { fontSize: 26, color: colors.text },
-  gapJyutping: { fontSize: 14, color: colors.accent },
-  speaker: { fontSize: 18 },
-  buttons: { marginTop: 32, gap: 10 },
-  button: { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
-  buttonText: { color: '#FFFFFF', fontSize: 17, fontWeight: '600' },
-  secondary: { paddingVertical: 12, alignItems: 'center' },
-  secondaryText: { color: colors.accent, fontSize: 17, fontWeight: '600' },
-  error: { fontSize: 14, color: colors.accent, textAlign: 'center' },
-  link: { fontSize: 16, color: colors.accent },
+  meterFill: { height: 8, borderRadius: 4, backgroundColor: colors.accent },
+  goal: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
+  goalText: { ...type.subhead, color: colors.text },
+  muted: { ...type.subhead, color: colors.secondary },
+  centered: { textAlign: 'center' },
+  suggest: { padding: 16, gap: 12 },
+  suggestText: { ...type.body, color: colors.text },
+  gapHanzi: { fontSize: 26, lineHeight: 34, color: colors.text, minWidth: 56 },
+  gapEnglish: { ...type.body, color: colors.text },
+  buttons: { gap: 4, paddingHorizontal: 16, marginTop: 4 },
+  error: { ...type.footnote, color: colors.destructive, textAlign: 'center', paddingHorizontal: 24 },
 });

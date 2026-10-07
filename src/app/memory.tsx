@@ -1,9 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+
+import { Group, Icon, IconButton, Row } from '@/components/ui';
 
 import { useAuth } from '@/lib/auth';
 import { PROFILE_KEY, updateProfile, useProfile } from '@/lib/profile';
-import { colors } from '@/lib/theme';
+import { colors, type } from '@/lib/theme';
 
 // F17: what the app remembers about the learner, with delete and clear all.
 export default function MemoryScreen() {
@@ -13,64 +15,75 @@ export default function MemoryScreen() {
   const facts = profile.data?.memory?.facts ?? [];
 
   const save = useMutation({
-    mutationFn: (next: string[]) =>
-      updateProfile(userId!, { memory: { facts: next } }),
+    mutationFn: (next: string[]) => updateProfile(userId!, { memory: { facts: next } }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: PROFILE_KEY }),
   });
 
-  if (profile.isPending) return <ActivityIndicator color={colors.accent} style={styles.spinner} />;
+  if (profile.isPending)
+    return (
+      <View style={styles.loading}>
+        <ActivityIndicator />
+      </View>
+    );
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      contentInsetAdjustmentBehavior="automatic">
       <Text style={styles.intro}>
         Characters use these to make chats feel personal. They're updated after chats of 4 messages or more.
       </Text>
-      {facts.length === 0 && <Text style={styles.empty}>Nothing yet. Tell a character about yourself!</Text>}
-      {facts.map((fact, i) => (
-        <View key={`${i}-${fact}`} style={styles.row}>
-          <Text style={styles.fact}>{fact}</Text>
-          <Pressable
-            hitSlop={10}
-            disabled={save.isPending}
-            onPress={() => save.mutate(facts.filter((_, j) => j !== i))}>
-            <Text style={styles.delete}>Delete</Text>
-          </Pressable>
+      {facts.length === 0 ? (
+        <View style={styles.empty}>
+          <Icon name="brain.head.profile" size={40} color={colors.tertiary} />
+          <Text style={styles.emptyText}>Nothing yet. Tell a character about yourself!</Text>
         </View>
-      ))}
-      {facts.length > 0 && (
-        <Pressable
-          style={styles.clear}
-          onPress={() =>
-            Alert.alert('Clear everything?', 'The app will forget all of these.', [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Clear all', style: 'destructive', onPress: () => save.mutate([]) },
-            ])
-          }>
-          <Text style={styles.delete}>Clear all</Text>
-        </Pressable>
+      ) : (
+        <Group footer={save.isError ? <Text style={styles.error}>{save.error.message}</Text> : undefined}>
+          {facts.map((fact, i) => (
+            <Row
+              key={`${i}-${fact}`}
+              title={fact}
+              accessory={
+                <IconButton
+                  name="minus.circle.fill"
+                  color={colors.destructive}
+                  label={`Delete: ${fact}`}
+                  disabled={save.isPending}
+                  onPress={() => save.mutate(facts.filter((_, j) => j !== i))}
+                  style={styles.delete}
+                />
+              }
+            />
+          ))}
+        </Group>
       )}
-      {save.isError && <Text style={styles.delete}>{save.error.message}</Text>}
+      {facts.length > 0 && (
+        <Group>
+          <Row
+            title="Clear all"
+            destructive
+            onPress={() =>
+              Alert.alert('Clear everything?', 'The app will forget all of these.', [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Clear all', style: 'destructive', onPress: () => save.mutate([]) },
+              ])
+            }
+          />
+        </Group>
+      )}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  spinner: { marginTop: 40 },
-  content: { padding: 16, gap: 10 },
-  intro: { fontSize: 14, color: colors.muted, lineHeight: 20 },
-  empty: { fontSize: 15, color: colors.muted, marginTop: 20 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 14,
-    borderRadius: 12,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  fact: { flex: 1, fontSize: 16, color: colors.text },
-  delete: { fontSize: 15, color: colors.accent },
-  clear: { alignSelf: 'center', padding: 12 },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
+  content: { paddingTop: 12, paddingBottom: 40, gap: 24 },
+  intro: { ...type.footnote, color: colors.secondary, marginHorizontal: 32 },
+  empty: { alignItems: 'center', gap: 12, marginTop: 40, paddingHorizontal: 32 },
+  emptyText: { ...type.subhead, color: colors.secondary, textAlign: 'center' },
+  delete: { marginVertical: -10, marginRight: -10 },
+  error: { ...type.footnote, color: colors.destructive, paddingHorizontal: 16, paddingTop: 7 },
 });

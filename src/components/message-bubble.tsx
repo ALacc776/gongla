@@ -1,8 +1,9 @@
-import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Icon, type IconName } from '@/components/ui';
 import { useDisplayStore } from '@/lib/display-store';
-import { colors } from '@/lib/theme';
+import { colors, hanzi as hanziStyle, radius, type } from '@/lib/theme';
 import { isReply, type ChatMessage, type UserPayload } from '@/lib/types';
 
 type Props = {
@@ -27,6 +28,20 @@ export function MessageBubble({ message, onTapSegment, onPlay, timing }: Props) 
       {bubble}
       <Text style={[styles.timing, message.role === 'user' && styles.timingRight]}>{timing}</Text>
     </View>
+  );
+}
+
+// A speaker button sized for inside a bubble, with a full-size touch area.
+function Speaker({ onPress, label = 'Play' }: { onPress: () => void; label?: string }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={12}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => pressed && styles.pressed}>
+      <Icon name="speaker.wave.2.fill" size={18} />
+    </Pressable>
   );
 }
 
@@ -60,13 +75,13 @@ function AssistantBubble({ message, onTapSegment, onPlay }: Props) {
       </View>
 
       {picked && (
-        <Pressable style={styles.gloss} onPress={() => onPlay?.(picked.hanzi)}>
+        <Pressable style={styles.gloss} onPress={() => onPlay?.(picked.hanzi)} accessibilityRole="button">
           <Text style={styles.glossHanzi}>{picked.hanzi}</Text>
           <View style={styles.flex}>
             <Text style={styles.glossJyutping}>{picked.jyutping}</Text>
             <Text style={styles.glossEnglish}>{picked.gloss}</Text>
           </View>
-          {onPlay && <Text style={styles.speaker}>🔊</Text>}
+          {onPlay && <Icon name="speaker.wave.2.fill" size={18} />}
         </Pressable>
       )}
 
@@ -74,17 +89,53 @@ function AssistantBubble({ message, onTapSegment, onPlay }: Props) {
         {english ? (
           <Text style={[styles.english, styles.shrink]}>{translation}</Text>
         ) : (
-          <Pressable style={styles.shrink} onPress={() => setRevealEnglish(!revealEnglish)} hitSlop={6}>
-            <Text style={styles.english}>{revealEnglish ? translation : 'Tap for English'}</Text>
+          <Pressable style={styles.shrink} onPress={() => setRevealEnglish(!revealEnglish)} hitSlop={8}>
+            <Text style={revealEnglish ? styles.english : styles.reveal}>
+              {revealEnglish ? translation : 'Tap for English'}
+            </Text>
           </Pressable>
         )}
-        {onPlay && (
-          <Pressable onPress={() => onPlay(segments.map((s) => s.hanzi).join(''))} hitSlop={10}>
-            <Text style={styles.speaker}>🔊</Text>
-          </Pressable>
-        )}
+        {onPlay && <Speaker label="Play this line" onPress={() => onPlay(segments.map((s) => s.hanzi).join(''))} />}
       </View>
     </View>
+  );
+}
+
+// A note under your own message: how to say it, a more natural way, or praise.
+function Note({
+  icon,
+  iconColor = colors.accent,
+  label,
+  children,
+  onPress,
+}: {
+  icon: IconName;
+  iconColor?: typeof colors.accent;
+  label?: string;
+  children: React.ReactNode;
+  onPress?: () => void;
+}) {
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.note, pressed && styles.pressed]}
+      onPress={onPress}
+      disabled={!onPress}
+      accessibilityRole={onPress ? 'button' : undefined}>
+      {label ? (
+        <>
+          <View style={styles.noteLabel}>
+            <Icon name={icon} size={14} color={iconColor} weight="semibold" />
+            <Text style={[styles.noteLabelText, { color: iconColor }]}>{label}</Text>
+          </View>
+          {children}
+        </>
+      ) : (
+        <View style={styles.noteLabel}>
+          <Icon name={icon} size={16} color={iconColor} weight="semibold" />
+          <View style={styles.shrink}>{children}</View>
+        </View>
+      )}
+    </Pressable>
   );
 }
 
@@ -103,37 +154,64 @@ function UserBubble({
         <Text style={styles.userText}>{text}</Text>
       </View>
       {payload?.gaps?.map((gap) => (
-        <Pressable key={gap.id} style={styles.chip} onPress={() => onPlay?.(gap.hanzi)}>
-          <Text style={styles.chipLabel}>Say it like this</Text>
-          <Text style={styles.chipHanzi}>
-            {gap.hanzi} <Text style={styles.chipJyutping}>{gap.jyutping}</Text>
-          </Text>
-          <Text style={styles.chipNote}>{gap.english}</Text>
-        </Pressable>
+        <Note key={gap.id} icon="lightbulb.fill" label="Say it like this" onPress={() => onPlay?.(gap.hanzi)}>
+          <View style={styles.noteRow}>
+            <View style={styles.shrink}>
+              <Text style={styles.noteHanzi}>{gap.hanzi}</Text>
+              <Text style={styles.noteJyutping}>{gap.jyutping}</Text>
+              <Text style={styles.noteText}>{gap.english}</Text>
+            </View>
+            {onPlay && <Icon name="speaker.wave.2.fill" size={18} />}
+          </View>
+        </Note>
       ))}
       {payload?.corrections?.map((c, i) => (
-        <Pressable key={i} style={styles.chip} onPress={() => onPlay?.(c.better)}>
-          <Text style={styles.chipLabel}>More natural</Text>
-          <Text style={styles.chipHanzi}>{c.better}</Text>
-          <Text style={styles.chipJyutping}>{c.better_jyutping}</Text>
-          <Text style={styles.chipNote}>{c.note}</Text>
-        </Pressable>
+        <Note key={i} icon="text.bubble.fill" label="More natural" onPress={() => onPlay?.(c.better)}>
+          <View style={styles.noteRow}>
+            <View style={styles.shrink}>
+              <Text style={styles.noteHanzi}>{c.better}</Text>
+              <Text style={styles.noteJyutping}>{c.better_jyutping}</Text>
+              <Text style={styles.noteText}>{c.note}</Text>
+            </View>
+            {onPlay && <Icon name="speaker.wave.2.fill" size={18} />}
+          </View>
+        </Note>
       ))}
       {payload?.used?.map((u) => (
-        <View key={u.id} style={[styles.chip, styles.usedChip]}>
-          <Text style={styles.usedText}>
-            ✓ You said <Text style={styles.usedHanzi}>{u.hanzi}</Text> on your own
+        <Note key={u.id} icon="checkmark.circle.fill" iconColor={colors.success}>
+          <Text style={styles.noteText}>
+            You said <Text style={styles.usedHanzi}>{u.hanzi}</Text> on your own
           </Text>
-        </View>
+        </Note>
       ))}
     </View>
   );
 }
 
+// Three dots that pulse in turn while the character is "typing".
 export function TypingBubble() {
+  const t = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.timing(t, { toValue: 1, duration: 1200, useNativeDriver: true }));
+    loop.start();
+    return () => loop.stop();
+  }, [t]);
   return (
-    <View style={[styles.bubble, styles.aiBubble]}>
-      <Text style={styles.typing}>…</Text>
+    <View style={[styles.bubble, styles.aiBubble, styles.typing]} accessibilityLabel="Typing">
+      {[0, 1, 2].map((i) => (
+        <Animated.View
+          key={i}
+          style={[
+            styles.typingDot,
+            {
+              opacity: t.interpolate({
+                inputRange: [0, i * 0.2, i * 0.2 + 0.2, i * 0.2 + 0.4, 1],
+                outputRange: [0.3, 0.3, 1, 0.3, 0.3],
+              }),
+            },
+          ]}
+        />
+      ))}
     </View>
   );
 }
@@ -141,53 +219,57 @@ export function TypingBubble() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   shrink: { flexShrink: 1 },
-  bubble: { maxWidth: '85%', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 10 },
-  aiBubble: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: 8,
+  pressed: { opacity: 0.6 },
+  bubble: {
+    maxWidth: '85%',
+    borderRadius: radius.bubble,
+    borderCurve: 'continuous',
+    paddingHorizontal: 14,
+    paddingVertical: 9,
   },
+  aiBubble: { alignSelf: 'flex-start', backgroundColor: colors.received, gap: 8 },
   userWrap: { alignSelf: 'flex-end', alignItems: 'flex-end', maxWidth: '85%', gap: 6 },
   userBubble: { alignSelf: 'flex-end', maxWidth: '100%', backgroundColor: colors.accent },
-  userText: { fontSize: 22, color: '#FFFFFF' },
+  userText: { ...hanziStyle, color: colors.onAccent },
   segments: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 2, rowGap: 4 },
   segment: { alignItems: 'center', borderRadius: 6, paddingHorizontal: 1 },
   segmentSelected: { backgroundColor: colors.accentSoft },
-  hanzi: { fontSize: 24, color: colors.text },
-  jyutping: { fontSize: 12, color: colors.muted },
+  hanzi: { fontSize: 24, lineHeight: 32, color: colors.text },
+  jyutping: { ...type.caption, color: colors.secondary },
   gloss: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    backgroundColor: colors.background,
-    borderRadius: 10,
-    padding: 10,
+    gap: 12,
+    paddingTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.separator,
   },
-  glossHanzi: { fontSize: 26, color: colors.text },
-  glossJyutping: { fontSize: 14, color: colors.accent },
-  glossEnglish: { fontSize: 15, color: colors.text },
-  footer: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 8 },
-  english: { fontSize: 15, color: colors.muted },
-  speaker: { fontSize: 18 },
-  typing: { fontSize: 22, color: colors.muted },
-  timing: { fontSize: 11, color: colors.muted, marginTop: 3, marginHorizontal: 4 },
+  glossHanzi: { fontSize: 28, lineHeight: 34, color: colors.text },
+  glossJyutping: { ...type.footnote, color: colors.secondary },
+  glossEnglish: { ...type.subhead, color: colors.text },
+  footer: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10 },
+  english: { ...type.subhead, color: colors.secondary },
+  reveal: { ...type.subhead, color: colors.accent },
+  timing: { ...type.caption, color: colors.tertiary, marginTop: 3, marginHorizontal: 4 },
   timingRight: { textAlign: 'right' },
-  chip: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: colors.accentSoft,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 2,
+
+  note: {
+    alignSelf: 'stretch',
+    backgroundColor: colors.inset,
+    borderRadius: 16,
+    borderCurve: 'continuous',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 4,
   },
-  chipLabel: { fontSize: 12, fontWeight: '600', color: colors.accent, textTransform: 'uppercase' },
-  chipHanzi: { fontSize: 22, color: colors.text },
-  chipJyutping: { fontSize: 14, color: colors.muted },
-  chipNote: { fontSize: 14, color: colors.muted },
-  usedChip: { borderColor: colors.border },
-  usedText: { fontSize: 14, color: colors.muted },
-  usedHanzi: { fontSize: 22, color: colors.text },
+  noteLabel: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  noteLabelText: { ...type.footnote, fontWeight: '600' },
+  noteRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  noteHanzi: { ...hanziStyle, color: colors.text },
+  noteJyutping: { ...type.footnote, color: colors.secondary },
+  noteText: { ...type.footnote, color: colors.secondary },
+  usedHanzi: { ...hanziStyle, color: colors.text },
+
+  typing: { flexDirection: 'row', gap: 5, paddingVertical: 15, paddingHorizontal: 16 },
+  typingDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.secondary },
 });

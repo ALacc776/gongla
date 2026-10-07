@@ -1,12 +1,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { Avatar, Button, Group } from '@/components/ui';
 import { endSession, generateScenario, startCustomSession } from '@/lib/api';
 import { useVoiceSettings } from '@/lib/audio';
 import { useOpenSession } from '@/lib/start-chat';
-import { colors } from '@/lib/theme';
+import { colors, hanzi, type } from '@/lib/theme';
 import type { ScenarioSpec } from '@/lib/types';
 
 type Spec = ScenarioSpec & { preview?: string };
@@ -51,84 +52,95 @@ export default function RehearseScreen() {
   const busy = generate.isPending || start.isPending;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      contentInsetAdjustmentBehavior="automatic"
+      keyboardShouldPersistTaps="handled">
       <Text style={styles.quote}>“{description}”</Text>
 
       {!spec && generate.isPending && (
         <View style={styles.loading}>
-          <ActivityIndicator color={colors.accent} />
+          <ActivityIndicator />
           <Text style={styles.muted}>Planning your rehearsal…</Text>
         </View>
       )}
 
       {spec && (
-        <View style={styles.card}>
-          <Text style={styles.emoji}>{spec.character.emoji ?? '💬'}</Text>
-          <Text style={styles.title}>{spec.title}</Text>
-          <Text style={styles.body}>
-            {spec.preview ??
-              `You'll be talking with ${spec.character.name}, ${spec.character.role}. ${spec.character.personality}.`}
-          </Text>
-          <Text style={styles.label}>Goal</Text>
-          <Text style={styles.body}>{spec.goal}</Text>
+        <>
+          <Group footer={`Difficulty ${spec.difficulty} of 5`}>
+            <View style={styles.intro}>
+              <Avatar emoji={spec.character.emoji} size={56} />
+              <Text style={styles.title}>{spec.title}</Text>
+              <Text style={styles.body}>
+                {spec.preview ??
+                  `You'll be talking with ${spec.character.name}, ${spec.character.role}. ${spec.character.personality}.`}
+              </Text>
+            </View>
+          </Group>
+          <Group header="Goal">
+            <Text style={[styles.body, styles.padded]}>{spec.goal}</Text>
+          </Group>
           {!!spec.key_phrases?.length && (
-            <>
-              <Text style={styles.label}>Phrases that might help</Text>
-              <Text style={styles.phrases}>{spec.key_phrases.join('　')}</Text>
-            </>
+            <Group header="Phrases that might help">
+              <Text style={[styles.phrases, styles.padded]}>{spec.key_phrases.join('　')}</Text>
+            </Group>
           )}
-          <Text style={styles.label}>Difficulty {spec.difficulty} of 5</Text>
-        </View>
+        </>
       )}
 
       {spec && editing && (
-        <View style={styles.editBox}>
-          <TextInput
-            style={styles.input}
-            value={edit}
-            onChangeText={setEdit}
-            placeholder="e.g. Make him more formal, and the goal is to ask for her hand"
-            placeholderTextColor={colors.muted}
-            multiline
-            autoFocus
-          />
-          <Pressable
-            style={[styles.secondary, (!edit.trim() || busy) && styles.disabled]}
-            disabled={!edit.trim() || busy}
-            onPress={() => generate.mutate({ edit: edit.trim() })}>
-            <Text style={styles.secondaryText}>Update</Text>
-          </Pressable>
-        </View>
+        <Group header="What should change?">
+          <View style={styles.editBox}>
+            <TextInput
+              style={styles.input}
+              value={edit}
+              onChangeText={setEdit}
+              placeholder="e.g. Make him more formal, and the goal is to ask for her hand"
+              placeholderTextColor={colors.placeholder}
+              multiline
+              autoFocus
+            />
+            <Button
+              title="Update"
+              size="small"
+              style={styles.update}
+              disabled={!edit.trim() || busy}
+              onPress={() => generate.mutate({ edit: edit.trim() })}
+            />
+          </View>
+        </Group>
       )}
 
       {spec && (
         <View style={styles.buttons}>
-          <Pressable style={[styles.button, busy && styles.disabled]} disabled={busy} onPress={() => start.mutate()}>
-            {start.isPending ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonText}>Start</Text>}
-          </Pressable>
+          <Button title="Start" loading={start.isPending} disabled={busy} onPress={() => start.mutate()} />
           <View style={styles.row}>
-            <Pressable style={[styles.secondary, styles.flex, busy && styles.disabled]} disabled={busy} onPress={() => setEditing(!editing)}>
-              <Text style={styles.secondaryText}>Edit</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.secondary, styles.flex, (busy || spec.difficulty >= 5) && styles.disabled]}
+            <Button
+              title="Edit"
+              icon="pencil"
+              variant="tinted"
+              style={styles.flex}
+              disabled={busy}
+              onPress={() => setEditing(!editing)}
+            />
+            <Button
+              title="Make it harder"
+              icon="arrow.up.right"
+              variant="tinted"
+              style={styles.flex}
               disabled={busy || spec.difficulty >= 5}
-              onPress={() => generate.mutate({ harder: true })}>
-              <Text style={styles.secondaryText}>Make it harder</Text>
-            </Pressable>
+              onPress={() => generate.mutate({ harder: true })}
+            />
           </View>
-          {generate.isPending && <ActivityIndicator color={colors.accent} />}
+          {generate.isPending && <ActivityIndicator />}
         </View>
       )}
 
       {(generate.isError || start.isError) && (
         <View style={styles.loading}>
           <Text style={styles.error}>{(generate.error ?? start.error)?.message}</Text>
-          {!spec && (
-            <Pressable onPress={() => generate.mutate({})}>
-              <Text style={styles.secondaryText}>Try again</Text>
-            </Pressable>
-          )}
+          {!spec && <Button title="Try again" variant="plain" onPress={() => generate.mutate({})} />}
         </View>
       )}
     </ScrollView>
@@ -138,46 +150,19 @@ export default function RehearseScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: 16, gap: 16 },
-  quote: { fontSize: 15, color: colors.muted, fontStyle: 'italic' },
+  content: { paddingTop: 12, paddingBottom: 40, gap: 24 },
+  quote: { ...type.subhead, color: colors.secondary, fontStyle: 'italic', marginHorizontal: 32 },
   loading: { alignItems: 'center', gap: 10, paddingVertical: 24 },
-  muted: { fontSize: 14, color: colors.muted },
-  card: {
-    padding: 18,
-    borderRadius: 16,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: 6,
-  },
-  emoji: { fontSize: 40 },
-  title: { fontSize: 20, fontWeight: '700', color: colors.text },
-  body: { fontSize: 16, color: colors.text, lineHeight: 22 },
-  label: { fontSize: 13, fontWeight: '600', color: colors.muted, marginTop: 8, textTransform: 'uppercase' },
-  phrases: { fontSize: 22, color: colors.text, lineHeight: 32 },
-  editBox: { gap: 8 },
-  input: {
-    minHeight: 64,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
-    padding: 12,
-    fontSize: 16,
-    color: colors.text,
-  },
-  buttons: { gap: 10 },
+  muted: { ...type.subhead, color: colors.secondary },
+  intro: { padding: 16, gap: 8 },
+  padded: { paddingHorizontal: 16, paddingVertical: 12 },
+  title: { ...type.title2, color: colors.text, marginTop: 4 },
+  body: { ...type.body, color: colors.text },
+  phrases: { ...hanzi, lineHeight: 34, color: colors.text },
+  editBox: { padding: 16, paddingBottom: 12, gap: 8 },
+  input: { ...type.body, minHeight: 66, color: colors.text, padding: 0, textAlignVertical: 'top' },
+  update: { alignSelf: 'flex-end' },
+  buttons: { gap: 10, marginHorizontal: 16 },
   row: { flexDirection: 'row', gap: 10 },
-  button: { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
-  buttonText: { color: '#FFFFFF', fontSize: 17, fontWeight: '600' },
-  secondary: {
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.accent,
-  },
-  secondaryText: { color: colors.accent, fontSize: 16, fontWeight: '600' },
-  disabled: { opacity: 0.4 },
-  error: { fontSize: 14, color: colors.accent, textAlign: 'center' },
+  error: { ...type.footnote, color: colors.destructive, textAlign: 'center' },
 });

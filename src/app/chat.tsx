@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useHeaderHeight } from 'expo-router/react-navigation';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -19,13 +20,14 @@ import { AskSheet } from '@/components/ask-sheet';
 import { LimitNotice } from '@/components/limit-notice';
 import { MessageBubble, TypingBubble } from '@/components/message-bubble';
 import { MicButton } from '@/components/mic-button';
+import { Button, Icon, Toggle } from '@/components/ui';
 import { ApiError, sendChat, tapGap } from '@/lib/api';
 import { receiveClip, useSpeaker, useVoiceSettings, warmUpAudio } from '@/lib/audio';
 import { routeInput } from '@/lib/btw';
 import { useDisplayStore } from '@/lib/display-store';
 import { formatSeconds, SHOW_TIMINGS, usePerfStore } from '@/lib/perf-store';
 import { supabase } from '@/lib/supabase';
-import { colors } from '@/lib/theme';
+import { colors, hanzi, radius, type } from '@/lib/theme';
 import { isReply, SESSION_COLUMNS, type ChatMessage, type SessionRow } from '@/lib/types';
 
 const LAYERS = [
@@ -37,6 +39,7 @@ const LAYERS = [
 export default function ChatScreen() {
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
   const insets = useSafeAreaInsets();
+  const headerHeight = useHeaderHeight();
   const queryClient = useQueryClient();
   const display = useDisplayStore();
   const [draft, setDraft] = useState('');
@@ -180,7 +183,11 @@ export default function ChatScreen() {
   function endChat() {
     Alert.alert('End this chat?', "You'll see your summary. Ended chats can't be continued.", [
       { text: 'Keep going', style: 'cancel' },
-      { text: 'End', style: 'destructive', onPress: () => router.replace({ pathname: '/summary', params: { sessionId } }) },
+      {
+        text: 'End',
+        style: 'destructive',
+        onPress: () => router.replace({ pathname: '/summary', params: { sessionId } }),
+      },
     ]);
   }
 
@@ -203,14 +210,20 @@ export default function ChatScreen() {
   // The list is inverted so it stays pinned to the newest message.
   const items: ChatMessage[] = [
     ...(messages.data ?? []),
-    ...(pendingText ? [{ id: 'pending', role: 'user' as const, text_raw: pendingText, payload: null, created_at: '' }] : []),
+    ...(pendingText
+      ? [{ id: 'pending', role: 'user' as const, text_raw: pendingText, payload: null, created_at: '' }]
+      : []),
     ...(streamingReply && !messages.data?.some((m) => m.id === streamingReply.id)
       ? [
           {
             id: streamingReply.id,
             role: 'assistant' as const,
             text_raw: streamingReply.hanzi,
-            payload: { segments: [{ hanzi: streamingReply.hanzi, gloss: '', jyutping: '' }], english: '', goal_met: false },
+            payload: {
+              segments: [{ hanzi: streamingReply.hanzi, gloss: '', jyutping: '' }],
+              english: '',
+              goal_met: false,
+            },
             created_at: '',
           },
         ]
@@ -218,44 +231,40 @@ export default function ChatScreen() {
   ].reverse();
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={12}>
-          <Text style={styles.back}>‹</Text>
-        </Pressable>
-        <View style={styles.titleWrap}>
-          <Text style={styles.title} numberOfLines={1}>
-            {spec ? `${spec.character.emoji ?? ''} ${spec.title}`.trim() : ''}
-          </Text>
-          {readOnly && <Text style={styles.subtitle}>Ended chat · read only</Text>}
-        </View>
-        {!readOnly && (
-          <Pressable onPress={endChat} hitSlop={10}>
-            <Text style={styles.end}>End</Text>
-          </Pressable>
-        )}
-      </View>
+    <View style={styles.container}>
+      <Stack.Screen
+        options={{
+          title: spec?.title ?? '',
+          headerRight: readOnly
+            ? undefined
+            : () => (
+                <Pressable onPress={endChat} hitSlop={10} accessibilityRole="button" style={styles.endButton}>
+                  <Text style={styles.end}>End</Text>
+                </Pressable>
+              ),
+        }}
+      />
+      {readOnly && <Text style={styles.subtitle}>Ended chat · read only</Text>}
       <View style={styles.toolbar}>
         {LAYERS.map(({ key, label }) => (
-          <Pressable
-            key={key}
-            onPress={() => display.toggle(key)}
-            style={[styles.toggle, display[key] && styles.toggleOn]}>
-            <Text style={[styles.toggleText, display[key] && styles.toggleTextOn]}>{label}</Text>
-          </Pressable>
+          <Toggle key={key} label={label} on={display[key]} onPress={() => display.toggle(key)} />
         ))}
         <View style={styles.flex} />
-        <Pressable
+        <Toggle
+          label="Slow"
+          icon="tortoise.fill"
+          on={display.slow}
           onPress={() => display.set({ slow: !display.slow })}
-          style={[styles.toggle, display.slow && styles.toggleOn]}>
-          <Text style={[styles.toggleText, display.slow && styles.toggleTextOn]}>🐢 slow</Text>
-        </Pressable>
+        />
       </View>
 
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={headerHeight}>
         {messages.isPending ? (
           <View style={styles.center}>
-            <ActivityIndicator color={colors.accent} />
+            <ActivityIndicator />
           </View>
         ) : (
           <FlatList
@@ -270,7 +279,9 @@ export default function ChatScreen() {
               <MessageBubble
                 message={item}
                 timing={SHOW_TIMINGS ? timingLine(item) : undefined}
-                onTapSegment={item.id === 'pending' || item.id === streamingReply?.id || readOnly ? undefined : onTapSegment}
+                onTapSegment={
+                  item.id === 'pending' || item.id === streamingReply?.id || readOnly ? undefined : onTapSegment
+                }
                 onPlay={speak}
               />
             )}
@@ -279,12 +290,21 @@ export default function ChatScreen() {
 
         {!readOnly && (goalMet || turnCapped) && (
           <Pressable
-            style={styles.banner}
-            onPress={() => router.replace({ pathname: '/summary', params: { sessionId } })}>
-            <Text style={styles.bannerText}>
-              {goalMet ? 'Scene complete! ' : 'This chat is at its length limit. '}
-              <Text style={styles.bannerLink}>See your summary ›</Text>
-            </Text>
+            style={({ pressed }) => [styles.banner, pressed && styles.pressed]}
+            onPress={() => router.replace({ pathname: '/summary', params: { sessionId } })}
+            accessibilityRole="button">
+            <Icon
+              name={goalMet ? 'checkmark.seal.fill' : 'flag.checkered'}
+              size={22}
+              color={goalMet ? colors.success : colors.secondary}
+            />
+            <View style={styles.flex}>
+              <Text style={styles.bannerTitle}>
+                {goalMet ? 'Scene complete!' : 'This chat is at its length limit.'}
+              </Text>
+              <Text style={styles.bannerLink}>See your summary</Text>
+            </View>
+            <Icon name="chevron.right" size={13} weight="semibold" color={colors.tertiary} />
           </Pressable>
         )}
 
@@ -298,35 +318,54 @@ export default function ChatScreen() {
 
         {readOnly ? (
           <View style={[styles.readOnlyBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-            <Pressable onPress={() => setAskOpen(true)}>
-              <Text style={styles.bannerLink}>Questions you asked</Text>
-            </Pressable>
-            <Pressable onPress={() => router.push({ pathname: '/summary', params: { sessionId } })}>
-              <Text style={styles.bannerLink}>Summary</Text>
-            </Pressable>
+            <Button
+              title="Questions you asked"
+              variant="tinted"
+              size="small"
+              icon="questionmark.bubble"
+              onPress={() => setAskOpen(true)}
+            />
+            <Button
+              title="Summary"
+              variant="tinted"
+              size="small"
+              icon="chart.bar.fill"
+              onPress={() => router.push({ pathname: '/summary', params: { sessionId } })}
+            />
           </View>
         ) : (
-          <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-            <Pressable style={styles.askButton} onPress={() => setAskOpen(true)} hitSlop={6}>
-              <Text style={styles.askText}>?</Text>
+          <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+            <Pressable
+              style={({ pressed }) => [styles.askButton, pressed && styles.pressed]}
+              onPress={() => setAskOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Ask a tutor">
+              <View style={styles.askCircle}>
+                <Icon name="questionmark" size={17} weight="semibold" />
+              </View>
             </Pressable>
-            <TextInput
-              style={styles.input}
-              value={draft}
-              onChangeText={setDraft}
-              placeholder={listening ? 'Listening…' : 'Reply any way you can'}
-              placeholderTextColor={colors.muted}
-              multiline
-              editable={!limited && !turnCapped}
-            />
-            {!!draft.trim() && (
-              <Pressable
-                style={[styles.sendButton, send.isPending && styles.sendDisabled]}
-                disabled={send.isPending}
-                onPress={() => submit()}>
-                <Text style={styles.sendText}>Send</Text>
-              </Pressable>
-            )}
+            <View style={styles.field}>
+              <TextInput
+                style={styles.input}
+                value={draft}
+                onChangeText={setDraft}
+                placeholder={listening ? 'Listening…' : 'Reply any way you can'}
+                placeholderTextColor={colors.placeholder}
+                multiline
+                editable={!limited && !turnCapped}
+              />
+              {!!draft.trim() && (
+                <Pressable
+                  style={({ pressed }) => [styles.sendButton, (pressed || send.isPending) && styles.pressed]}
+                  disabled={send.isPending}
+                  onPress={() => submit()}
+                  hitSlop={6}
+                  accessibilityRole="button"
+                  accessibilityLabel="Send">
+                  <Icon name="arrow.up.circle.fill" size={32} />
+                </Pressable>
+              )}
+            </View>
             {/* Always mounted so the mic stays ready; hidden while there's typed text. */}
             <MicButton
               hidden={!!draft.trim()}
@@ -352,99 +391,83 @@ export default function ChatScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: colors.plain },
   flex: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header: {
+  pressed: { opacity: 0.6 },
+  subtitle: { ...type.footnote, color: colors.secondary, textAlign: 'center', paddingBottom: 6 },
+  endButton: { paddingHorizontal: 6 },
+  end: { ...type.body, color: colors.accent },
+  toolbar: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.separator,
+  },
+  list: { paddingHorizontal: 16, paddingVertical: 12, gap: 10 },
+  banner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingHorizontal: 16,
-    paddingTop: 6,
-    paddingBottom: 4,
-  },
-  back: { fontSize: 30, lineHeight: 32, color: colors.accent },
-  titleWrap: { flex: 1 },
-  title: { fontSize: 17, fontWeight: '600', color: colors.text },
-  subtitle: { fontSize: 13, color: colors.muted },
-  end: { fontSize: 17, fontWeight: '600', color: colors.accent },
-  toolbar: {
-    flexDirection: 'row',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  toggle: {
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  toggleOn: { backgroundColor: colors.accent, borderColor: colors.accent },
-  toggleText: { fontSize: 14, color: colors.muted },
-  toggleTextOn: { color: '#FFFFFF' },
-  list: { padding: 16, gap: 10 },
-  banner: {
     marginHorizontal: 16,
     marginBottom: 8,
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.accentSoft,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: radius.card,
+    borderCurve: 'continuous',
+    backgroundColor: colors.inset,
   },
-  bannerText: { fontSize: 15, color: colors.text },
-  bannerLink: { fontSize: 15, fontWeight: '600', color: colors.accent },
-  error: { paddingHorizontal: 16, paddingBottom: 8, fontSize: 14, color: colors.accent },
+  bannerTitle: { ...type.headline, color: colors.text },
+  bannerLink: { ...type.subhead, color: colors.accent },
+  error: { ...type.footnote, paddingHorizontal: 16, paddingBottom: 8, color: colors.destructive },
   readOnlyBar: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+    justifyContent: 'center',
+    gap: 10,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.separator,
   },
   inputBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    gap: 8,
-    paddingHorizontal: 12,
+    gap: 6,
+    paddingHorizontal: 8,
     paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+    backgroundColor: colors.plain,
   },
-  askButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: colors.accent,
+  askButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  askCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: colors.fill,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  askText: { fontSize: 20, fontWeight: '700', color: colors.accent },
-  input: {
+  field: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
     minHeight: 44,
-    maxHeight: 120,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 22,
+    borderRadius: 22,
+    borderCurve: 'continuous',
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    borderColor: colors.separator,
+    backgroundColor: colors.plain,
+  },
+  input: {
+    ...hanzi,
+    flex: 1,
+    maxHeight: 132,
+    paddingLeft: 16,
+    paddingRight: 8,
+    paddingTop: 6,
+    paddingBottom: 6,
     color: colors.text,
   },
-  sendButton: {
-    height: 44,
-    justifyContent: 'center',
-    backgroundColor: colors.accent,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-  },
-  sendDisabled: { opacity: 0.4 },
-  sendText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+  sendButton: { width: 40, height: 42, alignItems: 'center', justifyContent: 'center' },
 });
