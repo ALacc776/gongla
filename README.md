@@ -6,6 +6,66 @@ A mobile app for practicing spoken Hong Kong Cantonese by chatting with AI chara
 - **Why it's built this way, in plain words:** [DESIGN_CHOICES.md](DESIGN_CHOICES.md). Update it whenever a big choice changes (instructions at the top).
 - **Working rules for AI agents:** [CLAUDE.md](CLAUDE.md). They are binding: never put API keys in the app, RLS on every table, build only the current milestone, ask before adding dependencies, and finish each task by telling the user exactly how to test it on their iPhone.
 
+## How it works
+
+```mermaid
+flowchart LR
+    subgraph Phone["iPhone (Expo app)"]
+        UI["Chat screen"]
+        Mic["Mic: 16 kHz WAV"]
+        Cache[("Voice clip cache")]
+    end
+
+    subgraph Supabase["Supabase (us-west-2)"]
+        Fn["Edge Functions<br/>chat, session-start, stt,<br/>tts, ask, session-end, ..."]
+        DB[("Postgres + RLS<br/>sessions, messages, gaps")]
+        Store[("Storage<br/>shared voice cache")]
+    end
+
+    Claude["Claude Haiku 4.5<br/>character + tutor"]
+    Azure["Azure Speech zh-HK<br/>speech to text + voices"]
+
+    Mic -->|recording| Fn
+    UI -->|"text (JWT)"| Fn
+    UI -.->|"reads own rows"| DB
+    Fn --> Claude
+    Fn --> Azure
+    Fn --> DB
+    Fn --> Store
+    Fn -->|"streamed reply + voice"| UI
+    UI --> Cache
+```
+
+A spoken turn, about 2.8 s from letting go of the mic to hearing the reply:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant You as You (iPhone)
+    participant Fn as Edge Functions
+    participant Az as Azure Speech
+    participant AI as Claude Haiku
+    participant DB as Postgres
+
+    You->>Fn: stt (your recording)
+    Fn->>Az: recognize zh-HK
+    Az-->>You: "唔該，兩位" (about 0.9 s)
+    You->>Fn: chat (text, speak=true)
+    Fn->>DB: load chat, check daily limit (one batch)
+    Fn->>AI: stream reply (forced tool use)
+    AI-->>Fn: "say" field first
+    Fn-->>You: reply text (about 1.3 s)
+    Fn->>Az: make her voice (streams)
+    Az-->>Fn: MP3 chunks
+    Fn-->>You: voice inline, phone plays it (about 0.7 s)
+    AI-->>Fn: glosses, gaps, corrections
+    Fn->>DB: save the 2 messages
+    Fn-->>You: done (Jyutping, chips)
+    Fn->>DB: gaps and word schedule, after the response
+```
+
+The history of these choices, in plain words: [DESIGN_CHOICES.md](DESIGN_CHOICES.md).
+
 ## Status
 
 | Milestone | Scope | State |
@@ -15,7 +75,8 @@ A mobile app for practicing spoken Hong Kong Cantonese by chatting with AI chara
 | M2 | Gap detection, corrections, Ask panel (`?` and `/btw`), tap-to-gloss, Mandarin detector | Done, tested live and in the Simulator |
 | M3 | Gap reuse + scheduling, Word Bank, session summary, learner memory, past chats, Continue card | Done, tested live and in the Simulator |
 | M4 | TTS with caching, 10 built-in scenarios, Rehearse My Real Life | Done, TTS verified on iPhone |
-| F14 | Voice input (hold-to-talk, pulled forward from v1.1) | Done, verified on iPhone |
+| F14 | Voice input (hold or tap to talk, pulled forward from v1.1) | Done, verified on iPhone |
+| Speed | Streamed replies with inline voice, writes after the response | Done: spoken turn 6.5 s → 2.8 s |
 | M5 (basic) | Level picker, settings, daily limits (429), account deletion | Done, tested live |
 | M5 (rest) | Sign in with Apple, RevenueCat | Not started (needs the Apple developer account) |
 | M6 / M7 | TestFlight, native-speaker review, App Store | Not started |
@@ -91,6 +152,8 @@ Auth: **anonymous sign-ins must be enabled** (Dashboard → Authentication → S
 3. `flagged_replies_view`: replies still Mandarin after one retry (F4), for review in the dashboard
 4. `usage_limits_and_tts_bucket`: `bump_usage()` (service role only, atomic daily counters) and the private `tts` Storage bucket
 5. `seed_launch_scenarios`: generated from `scenarios/*.json` (upserts, safe to regenerate as a new migration)
+6. `take_usage`: one-call daily limit check (reads the plan and applies the limit in SQL)
+7. `natural_speech_rate`: voices default to 1.0× speed
 
 ### Access model
 - The app only **reads** its own rows (plus built-in scenarios). Edge Functions write with the service role (`ctx.supabaseAdmin`).
@@ -130,6 +193,7 @@ How a spoken turn stays fast (6.5 s → 2.8 s median, see `perf/`):
 - The Azure Speech resource is in `eastus` while everything else runs in Oregon. Moving it to `westus2` would save roughly another 0.1–0.2 s per reply.
 
 ## Known gaps and risks
+- **Mic, iOS:** expo-audio turns the audio session off 0.1 s after playback ends or pauses unless the player has `keepAudioSessionActive: true`, which kills a running recording. The recorder is prepared ahead of time while a chat is open, and re-armed only after the upload (preparing empties the same file). See `src/components/mic-button.tsx` and `src/lib/audio.ts`.
 - Azure speech recognition writes numbers as digits (一杯 -> 1杯), so a spoken number won't string-match a target gap written in characters.
 - Level-1 replies are very short by design ("under 10 characters"); they can feel abrupt.
 - The model sometimes misses corrections; the server adds one for clear Mandarin words (是, 不, 他, 在, 看, 說, 們, 沒有, 什麼, 這, 那).
