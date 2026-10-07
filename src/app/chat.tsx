@@ -130,7 +130,14 @@ export default function ChatScreen() {
     onSuccess: ({ user_message, message, turn_count, turn_cap }) => {
       if (heardMs.current !== null) perf.record('heard', user_message.id, heardMs.current);
       heardMs.current = null;
-      queryClient.setQueryData<ChatMessage[]>(messagesKey, (old = []) => [...old, user_message, message]);
+      // Swap the previews for the saved messages in one go, so no message is listed twice.
+      setPendingText(null);
+      setStreamingReply(null);
+      queryClient.setQueryData<ChatMessage[]>(messagesKey, (old = []) => [
+        ...old.filter((m) => m.id !== user_message.id && m.id !== message.id),
+        user_message,
+        message,
+      ]);
       queryClient.invalidateQueries({ queryKey: ['gaps'] });
       if (turn_count >= turn_cap) setTurnCapped(true);
     },
@@ -197,7 +204,7 @@ export default function ChatScreen() {
   const items: ChatMessage[] = [
     ...(messages.data ?? []),
     ...(pendingText ? [{ id: 'pending', role: 'user' as const, text_raw: pendingText, payload: null, created_at: '' }] : []),
-    ...(streamingReply
+    ...(streamingReply && !messages.data?.some((m) => m.id === streamingReply.id)
       ? [
           {
             id: streamingReply.id,

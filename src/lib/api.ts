@@ -1,5 +1,6 @@
 import { FunctionRegion, FunctionsHttpError } from '@supabase/supabase-js';
 import { fetch as streamingFetch } from 'expo/fetch';
+import { File } from 'expo-file-system';
 
 import { saveClip } from '@/lib/clip-cache';
 import { supabase } from '@/lib/supabase';
@@ -151,8 +152,8 @@ export async function ttsSource(text: string, voice: string, rate: number) {
 }
 
 export async function transcribe(fileUri: string) {
-  const audio = await fetch(fileUri).then((r) => r.blob());
-  const res = await fetch(`${FUNCTIONS_URL}/stt`, {
+  const audio = await new File(fileUri).bytes();
+  const res = await streamingFetch(`${FUNCTIONS_URL}/stt`, {
     method: 'POST',
     headers: { ...(await authHeaders()), 'content-type': 'audio/wav' },
     body: audio,
