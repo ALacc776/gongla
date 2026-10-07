@@ -61,7 +61,7 @@ export function useVoiceSettings(voiceOverride?: string): VoiceSettings {
   const slow = useDisplayStore((s) => s.slow);
   return {
     voice: voiceOverride ?? profile?.voice ?? 'zh-HK-HiuMaanNeural',
-    rate: slow ? SLOW_RATE : (profile?.speech_rate ?? 0.85),
+    rate: slow ? SLOW_RATE : (profile?.speech_rate ?? 1),
   };
 }
 

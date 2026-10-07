@@ -61,7 +61,7 @@ async function chatStream(token, body) {
   const res = await fetch(`${URL_}/functions/v1/chat`, {
     method: 'POST',
     headers: { apikey: KEY, authorization: `Bearer ${token}`, 'content-type': 'application/json', ...REGION },
-    body: JSON.stringify({ ...body, speak: true, voice: VOICE, rate: 0.85 }),
+    body: JSON.stringify({ ...body, speak: true, voice: VOICE, rate: 1 }),
   });
   if (!res.ok) throw new Error(`chat ${res.status}: ${await res.text()}`);
   let audioMs;
@@ -92,7 +92,7 @@ async function chatStream(token, body) {
 // The streamed voice: time until the first audio bytes arrive, and until all have.
 async function ttsStream(token, text) {
   const started = performance.now();
-  const query = new URLSearchParams({ text, voice: VOICE, rate: '0.85' });
+  const query = new URLSearchParams({ text, voice: VOICE, rate: '1' });
   const res = await fetch(`${URL_}/functions/v1/tts?${query}`, {
     headers: { apikey: KEY, authorization: `Bearer ${token}`, ...REGION },
   });
@@ -124,7 +124,7 @@ for (let i = 0; i < TURNS; i++) {
 console.log(`Benchmarking ${TURNS} spoken turns against ${new globalThis.URL(URL_).host}…\n`);
 
 // The opener's voice comes back inside the session-start response.
-const opener = await call(token, 'session-start', { scenario_id: SCENARIO, rate: 0.85 });
+const opener = await call(token, 'session-start', { scenario_id: SCENARIO, rate: 1 });
 const openerTts = opener.json.audio ? { firstMs: 0 } : await ttsStream(token, opener.json.message.text_raw);
 const sessionId = opener.json.session_id;
 

@@ -91,7 +91,7 @@ export default function SettingsScreen() {
             <Chip
               key={r.value}
               label={r.label}
-              on={Math.abs((p?.speech_rate ?? 0.85) - r.value) < 0.01}
+              on={Math.abs((p?.speech_rate ?? 1) - r.value) < 0.01}
               onPress={() => save.mutate({ speech_rate: r.value })}
             />
           ))}

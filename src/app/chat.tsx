@@ -44,6 +44,7 @@ export default function ChatScreen() {
   const [askOpen, setAskOpen] = useState(false);
   const [askQuestion, setAskQuestion] = useState<string | null>(null);
   const [turnCapped, setTurnCapped] = useState(false);
+  const [listening, setListening] = useState(false);
   // The reply while it streams in: its text arrives before the glosses and gaps.
   const [streamingReply, setStreamingReply] = useState<{ id: string; hanzi: string } | null>(null);
 
@@ -306,7 +307,7 @@ export default function ChatScreen() {
               style={styles.input}
               value={draft}
               onChangeText={setDraft}
-              placeholder="Reply any way you can"
+              placeholder={listening ? 'Listening…' : 'Reply any way you can'}
               placeholderTextColor={colors.muted}
               multiline
               editable={!limited && !turnCapped}
@@ -322,6 +323,7 @@ export default function ChatScreen() {
               <MicButton
                 disabled={send.isPending || limited || turnCapped}
                 onTranscript={onTranscript}
+                onListeningChange={setListening}
               />
             )}
           </View>

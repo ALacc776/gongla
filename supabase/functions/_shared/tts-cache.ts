@@ -16,7 +16,7 @@ export function ttsParams(raw: { text?: unknown; voice?: unknown; rate?: unknown
   if (!text || text.length > MAX_TTS_LENGTH) return null;
   const voice = typeof raw.voice === 'string' && (VOICES as readonly string[]).includes(raw.voice) ? raw.voice : DEFAULT_VOICE;
   const rateNumber = Number(raw.rate);
-  const rate = Number.isFinite(rateNumber) ? Math.min(Math.max(Math.round(rateNumber * 100) / 100, 0.5), 1.5) : 0.85;
+  const rate = Number.isFinite(rateNumber) ? Math.min(Math.max(Math.round(rateNumber * 100) / 100, 0.5), 1.5) : 1;
   return { text, voice, rate, format: raw.format === 'wav' ? 'wav' : 'mp3' };
 }
 
