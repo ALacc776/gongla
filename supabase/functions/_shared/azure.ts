@@ -54,27 +54,37 @@ export async function synthesize(text: string, voice: string, rate: number, form
 
 export type Recognition = { text: string; status: string };
 
+// Recognition normally takes under a second; past this it has stalled.
+const RECOGNIZE_TIMEOUT_MS = 15_000;
+
 // Short-audio recognition: up to 60 s of 16 kHz mono WAV. `status` is Azure's
 // RecognitionStatus (Success, NoMatch, InitialSilenceTimeout, ...).
 export async function recognize(wav: Uint8Array): Promise<Recognition> {
   const { key, region } = config();
-  const res = await fetch(
-    `https://${region}.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1?language=zh-HK&format=simple`,
-    {
-      method: 'POST',
-      headers: {
-        'Ocp-Apim-Subscription-Key': key,
-        'Content-Type': 'audio/wav; codecs=audio/pcm; samplerate=16000',
-        Accept: 'application/json',
+  let json;
+  try {
+    const res = await fetch(
+      `https://${region}.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1?language=zh-HK&format=simple`,
+      {
+        method: 'POST',
+        headers: {
+          'Ocp-Apim-Subscription-Key': key,
+          'Content-Type': 'audio/wav; codecs=audio/pcm; samplerate=16000',
+          Accept: 'application/json',
+        },
+        body: wav,
+        signal: AbortSignal.timeout(RECOGNIZE_TIMEOUT_MS),
       },
-      body: wav,
-    },
-  );
-  if (!res.ok) {
-    console.error('Azure STT error', res.status, await res.text());
-    throw new Error('The speech service failed. Try again.');
+    );
+    if (!res.ok) {
+      console.error('Azure STT error', res.status, await res.text());
+      throw new Error('The speech service failed. Try again.');
+    }
+    json = await res.json();
+  } catch (e) {
+    if ((e as Error).name === 'TimeoutError') throw new Error('Speech recognition took too long. Try again.');
+    throw e;
   }
-  const json = await res.json();
   return {
     text: json.RecognitionStatus === 'Success' ? (json.DisplayText ?? '').trim() : '',
     status: json.RecognitionStatus ?? 'Unknown',

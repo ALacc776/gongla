@@ -87,17 +87,20 @@ export type ChatHandlers = {
 };
 
 // One roleplay turn, streamed. With `speech`, the server also sends the reply's
-// voice straight after its text. Resolves with the saved messages.
+// voice straight after its text. Resolves with the saved messages. Aborting `signal`
+// cancels the turn: the server stops and saves nothing.
 export async function sendChat(
   sessionId: string,
   text: string,
   handlers: ChatHandlers,
   speech?: { voice: string; rate: number },
+  signal?: AbortSignal,
 ): Promise<ChatResult> {
   const res = await streamingFetch(`${FUNCTIONS_URL}/chat`, {
     method: 'POST',
     headers: { ...(await authHeaders(DB_REGION)), 'content-type': 'application/json' },
     body: JSON.stringify({ session_id: sessionId, text, speak: !!speech, ...speech }),
+    signal,
   });
   if (!res.ok || !res.body) {
     const json = await res.json().catch(() => null);
@@ -151,16 +154,30 @@ export async function ttsSource(text: string, voice: string, rate: number) {
   return { uri: `${FUNCTIONS_URL}/tts?${query}`, headers: await authHeaders(DB_REGION) };
 }
 
+// Recognition takes about a second; past this something has stalled.
+const TRANSCRIBE_TIMEOUT_MS = 20_000;
+
 export async function transcribe(fileUri: string) {
   const audio = await new File(fileUri).bytes();
-  const res = await streamingFetch(`${FUNCTIONS_URL}/stt`, {
-    method: 'POST',
-    headers: { ...(await authHeaders()), 'content-type': 'audio/wav' },
-    body: audio,
-  });
-  const json = await res.json().catch(() => null);
-  if (!res.ok) throw new ApiError(json?.error ?? 'Could not understand the audio', res.status, json?.reason ?? null);
-  return json as { text: string; status: string; seconds: number; peak: number };
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TRANSCRIBE_TIMEOUT_MS);
+  try {
+    const res = await streamingFetch(`${FUNCTIONS_URL}/stt`, {
+      method: 'POST',
+      headers: { ...(await authHeaders()), 'content-type': 'audio/wav' },
+      body: audio,
+      signal: controller.signal,
+    });
+    const json = await res.json().catch(() => null);
+    if (controller.signal.aborted) throw new Error('aborted');
+    if (!res.ok) throw new ApiError(json?.error ?? 'Could not understand the audio', res.status, json?.reason ?? null);
+    return json as { text: string; status: string; seconds: number; peak: number };
+  } catch (e) {
+    if (controller.signal.aborted) throw new ApiError('That took too long. Try again, or type it.', null, null);
+    throw e;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export function deleteAccount() {

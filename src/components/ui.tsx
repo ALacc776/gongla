@@ -90,6 +90,8 @@ export function Button({
     <Pressable
       onPress={onPress}
       disabled={disabled || loading}
+      // Small capsules are 34pt tall; this makes the touch target 44pt.
+      hitSlop={size === 'small' ? 5 : undefined}
       accessibilityRole="button"
       accessibilityState={{ disabled: !!disabled, busy: !!loading }}
       style={({ pressed }) => [

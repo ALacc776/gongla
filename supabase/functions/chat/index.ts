@@ -100,11 +100,31 @@ export default {
     const userMessageId = crypto.randomUUID();
     const assistantMessageId = crypto.randomUUID();
     const encoder = new TextEncoder();
+    // The app gave up on this turn (Stop, Try again or its timeout): stop the model
+    // and save nothing, so a resend can't leave the same turn in the chat twice.
+    const cancel = new AbortController();
+    req.signal.addEventListener('abort', () => cancel.abort(), { once: true });
 
     const body = new ReadableStream<Uint8Array>({
+      cancel() {
+        cancel.abort();
+      },
       async start(controller) {
-        const send = (event: Record<string, unknown>) =>
-          controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+        const send = (event: Record<string, unknown>) => {
+          if (cancel.signal.aborted) return;
+          try {
+            controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+          } catch {
+            // The app has disconnected.
+          }
+        };
+        const close = () => {
+          try {
+            controller.close();
+          } catch {
+            // Already closed by the app disconnecting.
+          }
+        };
         let sayAt: number | null = null;
 
         // The reply's voice, started the moment its text exists. Cached phrases come
@@ -158,12 +178,13 @@ export default {
               send({ type: 'say', message_id: assistantMessageId, hanzi: say });
               startAudio(say);
             },
+            cancel.signal,
           );
         } catch (e) {
           await refund();
           await audioTask;
           send({ type: 'error', error: (e as Error).message });
-          controller.close();
+          close();
           return;
         }
         timer.mark('model');
@@ -223,6 +244,14 @@ export default {
           return said && !lastAssistantTexts.some((text) => text.includes(t.hanzi));
         });
 
+        if (cancel.signal.aborted) {
+          console.warn('chat turn cancelled before saving', { turn: session.turn_count + 1 });
+          await refund();
+          await audioTask;
+          close();
+          return;
+        }
+
         // Save the two messages (and the turn count, which the next turn checks), then finish.
         // Explicit timestamps keep the order stable: one insert shares a single now().
         const [{ data: saved, error: saveError }] = await Promise.all([
@@ -258,25 +287,28 @@ export default {
           console.error('message save failed', saveError);
           await audioTask;
           send({ type: 'error', error: 'Could not save the message' });
-          controller.close();
+          close();
           return;
         }
 
+        const timings = {
+          ...timer.done(),
+          say: sayAt,
+          model_calls: result.calls.length,
+          output_tokens: result.calls.reduce((n, c) => n + c.output_tokens, 0),
+        };
+        // In the function logs too, so a slow turn on someone's phone shows which step was slow.
+        console.log('chat timings', { turn: session.turn_count + 1, ...timings });
         send({
           type: 'done',
           user_message: saved[0],
           message: saved[1],
           turn_count: session.turn_count + 1,
           turn_cap: TURN_CAP,
-          timings: {
-            ...timer.done(),
-            say: sayAt,
-            model_calls: result.calls.length,
-            output_tokens: result.calls.reduce((n, c) => n + c.output_tokens, 0),
-          },
+          timings,
         });
         await audioTask;
-        controller.close();
+        close();
 
         // After the response: gaps, events and schedules (F2, F5).
         EdgeRuntime.waitUntil(

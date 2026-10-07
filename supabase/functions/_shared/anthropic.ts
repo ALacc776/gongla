@@ -13,17 +13,40 @@ type CallOptions = {
   tool: Tool;
   maxTokens?: number;
   temperature?: number;
+  // Aborts the call, e.g. when the app has given up on the turn.
+  signal?: AbortSignal;
 };
+
+// A call that hasn't finished by now has stalled; better to fail and let the learner retry.
+const TIMEOUT_MS = 20_000;
 
 export async function callTool<T>(opts: CallOptions): Promise<T> {
   return (await callToolWithStats<T>(opts)).input;
 }
 
-function request(opts: CallOptions, stream: boolean) {
+function timeoutSignal(opts: CallOptions) {
+  const timeout = AbortSignal.timeout(TIMEOUT_MS);
+  return opts.signal ? AbortSignal.any([opts.signal, timeout]) : timeout;
+}
+
+// A timeout becomes a message the learner can act on; a cancel passes through as is.
+function failed(e: unknown, signal: AbortSignal): Error {
+  if (signal.aborted && (signal.reason as Error)?.name === 'TimeoutError') {
+    return new Error('The AI took too long. Try again.');
+  }
+  return e as Error;
+}
+
+function warnIfCut(stopReason: string | undefined) {
+  if (stopReason === 'max_tokens') console.warn('Reply was cut off at max_tokens');
+}
+
+function request(opts: CallOptions, stream: boolean, signal: AbortSignal) {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set');
   return fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
+    signal,
     headers: {
       'content-type': 'application/json',
       'x-api-key': apiKey,
@@ -48,8 +71,21 @@ export async function streamToolWithStats<T>(
   opts: CallOptions,
   onJson: (partial: string) => void,
 ): Promise<{ input: T; stats: CallStats }> {
+  const signal = timeoutSignal(opts);
+  try {
+    return await streamTool<T>(opts, onJson, signal);
+  } catch (e) {
+    throw failed(e, signal);
+  }
+}
+
+async function streamTool<T>(
+  opts: CallOptions,
+  onJson: (partial: string) => void,
+  signal: AbortSignal,
+): Promise<{ input: T; stats: CallStats }> {
   const started = performance.now();
-  const res = await request(opts, true);
+  const res = await request(opts, true, signal);
   if (!res.ok || !res.body) {
     console.error('Anthropic error', res.status, await res.text());
     throw new Error('The AI service failed. Try again.');
@@ -79,6 +115,7 @@ export async function streamToolWithStats<T>(
         onJson(json);
       } else if (data.type === 'message_delta') {
         stats.output_tokens = data.usage?.output_tokens ?? stats.output_tokens;
+        warnIfCut(data.delta?.stop_reason);
       } else if (data.type === 'error') {
         console.error('Anthropic stream error', data.error);
         throw new Error('The AI service failed. Try again.');
@@ -96,15 +133,21 @@ export async function streamToolWithStats<T>(
 
 // Same as callTool, plus how long the call took and how many tokens it used.
 export async function callToolWithStats<T>(opts: CallOptions): Promise<{ input: T; stats: CallStats }> {
+  const signal = timeoutSignal(opts);
   const started = performance.now();
-  const res = await request(opts, false);
-
-  if (!res.ok) {
-    console.error('Anthropic error', res.status, await res.text());
-    throw new Error('The AI service failed. Try again.');
+  let data;
+  try {
+    const res = await request(opts, false, signal);
+    if (!res.ok) {
+      console.error('Anthropic error', res.status, await res.text());
+      throw new Error('The AI service failed. Try again.');
+    }
+    data = await res.json();
+  } catch (e) {
+    throw failed(e, signal);
   }
 
-  const data = await res.json();
+  warnIfCut(data.stop_reason);
   const toolUse = data.content?.find((block: { type: string }) => block.type === 'tool_use');
   if (!toolUse?.input) throw new Error('The AI returned an unexpected reply. Try again.');
   return {

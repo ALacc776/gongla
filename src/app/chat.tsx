@@ -36,6 +36,20 @@ const LAYERS = [
   { key: 'english', label: 'EN' },
 ] as const;
 
+// No reply text this long after sending: offer Stop and Try again.
+const STALL_MS = 10_000;
+// Give up on a turn after this long.
+const GIVE_UP_MS = 60_000;
+
+type CancelReason = 'stop' | 'retry' | 'timeout';
+
+// A turn called off by the learner (Stop, Try again) or by the time limit.
+class TurnCancelled extends Error {
+  constructor(public reason: CancelReason) {
+    super(reason === 'timeout' ? 'That took too long. Try again.' : 'Cancelled');
+  }
+}
+
 export default function ChatScreen() {
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
   const insets = useSafeAreaInsets();
@@ -100,35 +114,56 @@ export default function ChatScreen() {
   const perf = usePerfStore();
   // How long the last voice recording took to turn into text; attached to the next sent message.
   const heardMs = useRef<number | null>(null);
+  // The turn in flight, so Stop, Try again and the time limit can cancel it.
+  const turn = useRef<{ controller: AbortController; reason: CancelReason } | null>(null);
+  // No reply text yet, a while after sending.
+  const [stalled, setStalled] = useState(false);
 
   const send = useMutation({
-    mutationFn: ({ text, spoken }: { text: string; spoken: boolean }) => {
+    mutationFn: async ({ text, spoken }: { text: string; spoken: boolean }) => {
       const started = Date.now();
+      const current = { controller: new AbortController(), reason: 'stop' as CancelReason };
+      turn.current = current;
+      const stallTimer = setTimeout(() => setStalled(true), STALL_MS);
+      const giveUpTimer = setTimeout(() => cancelTurn('timeout'), GIVE_UP_MS);
       // A turn you spoke always answers out loud; its voice streams in with the reply.
       const wantVoice = spoken || display.autoplay;
       let clip: ReturnType<typeof receiveClip> | null = null;
       let sayText = '';
-      return sendChat(
-        sessionId,
-        text,
-        {
-          onSay: (say) => {
-            perf.record('reply', say.message_id, Date.now() - started);
-            setStreamingReply({ id: say.message_id, hanzi: say.hanzi });
-            played.current?.add(say.message_id);
-            sayText = say.hanzi;
-            if (wantVoice) clip = receiveClip(say.hanzi, voiceSettings);
+      try {
+        return await sendChat(
+          sessionId,
+          text,
+          {
+            onSay: (say) => {
+              clearTimeout(stallTimer);
+              setStalled(false);
+              perf.record('reply', say.message_id, Date.now() - started);
+              setStreamingReply({ id: say.message_id, hanzi: say.hanzi });
+              played.current?.add(say.message_id);
+              sayText = say.hanzi;
+              if (wantVoice) clip = receiveClip(say.hanzi, voiceSettings);
+            },
+            onAudio: (b64) => clip?.append(b64),
+            onAudioEnd: () => {
+              clip?.play().then((ok) => {
+                if (!ok) speak(sayText);
+              });
+            },
+            onAudioError: () => speak(sayText),
           },
-          onAudio: (b64) => clip?.append(b64),
-          onAudioEnd: () => {
-            clip?.play().then((ok) => {
-              if (!ok) speak(sayText);
-            });
-          },
-          onAudioError: () => speak(sayText),
-        },
-        wantVoice ? voiceSettings : undefined,
-      );
+          wantVoice ? voiceSettings : undefined,
+          current.controller.signal,
+        );
+      } catch (e) {
+        if (current.controller.signal.aborted) throw new TurnCancelled(current.reason);
+        throw e;
+      } finally {
+        clearTimeout(stallTimer);
+        clearTimeout(giveUpTimer);
+        setStalled(false);
+        if (turn.current === current) turn.current = null;
+      }
     },
     onSuccess: ({ user_message, message, turn_count, turn_cap }) => {
       if (heardMs.current !== null) perf.record('heard', user_message.id, heardMs.current);
@@ -144,7 +179,19 @@ export default function ChatScreen() {
       queryClient.invalidateQueries({ queryKey: ['gaps'] });
       if (turn_count >= turn_cap) setTurnCapped(true);
     },
-    onError: (_error, { text }) => setDraft(text),
+    onError: (error, { text, spoken }) => {
+      if (error instanceof TurnCancelled) {
+        // The server saves nothing once a turn is cancelled, but if it finished just
+        // before, this brings the saved turn in.
+        queryClient.invalidateQueries({ queryKey: messagesKey });
+        if (error.reason === 'retry') {
+          // After this turn's onSettled has cleared it away.
+          setTimeout(() => startTurn(text, spoken));
+          return;
+        }
+      }
+      setDraft(text);
+    },
     onSettled: () => {
       setPendingText(null);
       setStreamingReply(null);
@@ -161,8 +208,19 @@ export default function ChatScreen() {
       setAskOpen(true);
       return;
     }
-    setPendingText(route.text);
-    send.mutate({ text: route.text, spoken });
+    startTurn(route.text, spoken);
+  }
+
+  function startTurn(text: string, spoken: boolean) {
+    setPendingText(text);
+    send.mutate({ text, spoken });
+  }
+
+  function cancelTurn(reason: CancelReason) {
+    const current = turn.current;
+    if (!current) return;
+    current.reason = reason;
+    current.controller.abort();
   }
 
   // F14: what the mic heard. Sent straight away when auto-send is on, unless
@@ -206,6 +264,8 @@ export default function ChatScreen() {
   const lastReply = messages.data?.filter((m) => m.role === 'assistant').at(-1);
   const goalMet = isReply(lastReply?.payload ?? null) && (lastReply!.payload as { goal_met: boolean }).goal_met;
   const limited = send.error instanceof ApiError && send.error.reason === 'daily_limit';
+  // Stop puts the text back in the box; nothing to report.
+  const stopped = send.error instanceof TurnCancelled && send.error.reason !== 'timeout';
 
   // The list is inverted so it stays pinned to the newest message.
   const items: ChatMessage[] = [
@@ -274,7 +334,34 @@ export default function ChatScreen() {
             contentContainerStyle={styles.list}
             keyboardDismissMode="interactive"
             keyboardShouldPersistTaps="handled"
-            ListHeaderComponent={send.isPending && !streamingReply ? <TypingBubble /> : null}
+            ListHeaderComponent={
+              send.isPending && !streamingReply ? (
+                <View style={styles.waiting}>
+                  <TypingBubble />
+                  {stalled && (
+                    <>
+                      <Text style={styles.stalledText}>Taking longer than usual</Text>
+                      <View style={styles.stalledButtons}>
+                        <Button
+                          title="Stop"
+                          variant="plain"
+                          size="small"
+                          icon="stop.fill"
+                          onPress={() => cancelTurn('stop')}
+                        />
+                        <Button
+                          title="Try again"
+                          variant="tinted"
+                          size="small"
+                          icon="arrow.clockwise"
+                          onPress={() => cancelTurn('retry')}
+                        />
+                      </View>
+                    </>
+                  )}
+                </View>
+              ) : null
+            }
             renderItem={({ item }) => (
               <MessageBubble
                 message={item}
@@ -311,8 +398,8 @@ export default function ChatScreen() {
         {limited ? (
           <LimitNotice name={spec?.character.name} />
         ) : (
-          (send.isError || messages.isError) && (
-            <Text style={styles.error}>{send.error?.message ?? 'Could not load this chat.'}</Text>
+          ((send.isError && !stopped) || messages.isError) && (
+            <Text style={styles.error}>{(!stopped && send.error?.message) || 'Could not load this chat.'}</Text>
           )
         )}
 
@@ -408,6 +495,9 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.separator,
   },
   list: { paddingHorizontal: 16, paddingVertical: 12, gap: 10 },
+  waiting: { alignItems: 'flex-start', gap: 8 },
+  stalledText: { ...type.footnote, color: colors.secondary, paddingLeft: 4 },
+  stalledButtons: { flexDirection: 'row', gap: 8 },
   banner: {
     flexDirection: 'row',
     alignItems: 'center',

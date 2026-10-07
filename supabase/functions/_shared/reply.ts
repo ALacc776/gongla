@@ -292,13 +292,19 @@ async function callReply(
   calls: CallStats[],
   extraSystem?: string,
   onPartial?: (json: string) => void,
+  signal?: AbortSignal,
 ) {
   const system: SystemBlock[] = [
     { type: 'text', text: STATIC_PROMPT, cache_control: { type: 'ephemeral' } },
     { type: 'text', text: dynamicPrompt(ctx) },
   ];
   if (extraSystem) system.push({ type: 'text', text: extraSystem });
-  const options = { system, messages: withLeadingUserTurn(history), tool: replyTool(Boolean(ctx.candidates)) };
+  const options = {
+    system,
+    messages: withLeadingUserTurn(history),
+    tool: replyTool(Boolean(ctx.candidates)),
+    signal,
+  };
   const { input, stats } = onPartial
     ? await streamToolWithStats<ReplyInput>(options, onPartial)
     : await callToolWithStats<ReplyInput>(options);
@@ -316,10 +322,13 @@ function sayOf(input: ReplyInput): string {
 // With onSay, the model call streams and onSay gets the spoken reply as soon as it
 // has fully arrived and passed the Mandarin check, before the glosses and gaps.
 // A reply that fails the check is not emitted; the caller sends `say` from the result.
+// A retry streams too, so a good retried reply still reaches onSay early.
+// `signal` cancels the model calls, e.g. when the app has given up on the turn.
 export async function generateReply(
   ctx: ReplyContext,
   history: ChatTurn[],
   onSay?: (say: string) => void,
+  signal?: AbortSignal,
 ): Promise<ReplyResult> {
   const calls: CallStats[] = [];
   // Every reply ends with a question so the learner has a turn, except the goodbye.
@@ -339,7 +348,7 @@ export async function generateReply(
       }
     : undefined;
 
-  let input = await callReply(ctx, history, calls, undefined, onPartial);
+  let input = await callReply(ctx, history, calls, undefined, onPartial, signal);
   let check = checkMandarin(sayOf(input));
   let asks = asksEnough(sayOf(input));
 
@@ -355,12 +364,17 @@ export async function generateReply(
     if (!asks) problems.push('it did not end with a question for the learner. End it with exactly one natural question.');
     // Mandarin is the worse problem; ties go to the lower Mandarin score.
     const badness = (c: typeof check, a: boolean) => (c.score >= MANDARIN_THRESHOLD ? 2 : 0) + (a ? 0 : 1);
+    // The first draft's say was never emitted (it failed the check), so the retry's can be.
+    // One that is emitted passes both checks, so it always wins the comparison below.
+    sayChecked = false;
     try {
       const retry = await callReply(
         ctx,
         history,
         calls,
         `IMPORTANT: your previous draft of this reply had a problem: ${problems.join(' Also, ')}`,
+        onPartial,
+        signal,
       );
       const retryCheck = checkMandarin(sayOf(retry));
       const retryAsks = asksEnough(sayOf(retry));
@@ -372,6 +386,8 @@ export async function generateReply(
         asks = retryAsks;
       }
     } catch (e) {
+      // Its say may already be on the learner's screen; the first draft can't replace it.
+      if (sayEmitted) throw e;
       console.error('Reply retry failed', e);
     }
   }
