@@ -13,8 +13,8 @@ A mobile app for practicing spoken Hong Kong Cantonese by chatting with AI chara
 | M1 | Chat loop, layered display, server-side Jyutping | Done, tested live and in the iOS Simulator |
 | M2 | Gap detection, corrections, Ask panel (`?` and `/btw`), tap-to-gloss, Mandarin detector | Done, tested live and in the Simulator |
 | M3 | Gap reuse + scheduling, Word Bank, session summary, learner memory, past chats, Continue card | Done, tested live and in the Simulator |
-| M4 | TTS with caching, 10 built-in scenarios, Rehearse My Real Life | Done. **TTS needs the Azure secrets** (see below) |
-| F14 | Voice input (hold-to-talk, pulled forward from v1.1) | Built. **Needs the Azure secrets**, then a real-device test |
+| M4 | TTS with caching, 10 built-in scenarios, Rehearse My Real Life | Done, TTS verified on iPhone |
+| F14 | Voice input (hold-to-talk, pulled forward from v1.1) | Done, verified on iPhone |
 | M5 (basic) | Level picker, settings, daily limits (429), account deletion | Done, tested live |
 | M5 (rest) | Sign in with Apple, RevenueCat | Not started (needs the Apple developer account) |
 | M6 / M7 | TestFlight, native-speaker review, App Store | Not started |
@@ -80,7 +80,7 @@ supabase functions deploy <name>     # session-start chat session-end gap-tap as
 Set with `supabase secrets set NAME=value`. Never write them to a file or paste them into chat.
 
 - `ANTHROPIC_API_KEY` (set)
-- `AZURE_SPEECH_KEY` and `AZURE_SPEECH_REGION` (needed for TTS and voice input; region e.g. `eastasia`)
+- `AZURE_SPEECH_KEY` and `AZURE_SPEECH_REGION` (set; Free F0 resource in `eastus`)
 
 Auth: **anonymous sign-ins must be enabled** (Dashboard → Authentication → Sign In / Providers).
 
@@ -112,11 +112,11 @@ All use `withSupabase({ auth: 'user' })`. Reads go through the caller's RLS (`ct
 Daily limits (F12): free 25 messages and 10 tutor questions; pro 300 and 100. To make yourself pro for testing, run in the SQL editor: `update profiles set plan = 'pro' where id = '<your user id from Settings>';`
 
 ## Known gaps and risks
-- **Voice (TTS and mic) is untested** until the Azure secrets are set. Recording uses 16 kHz mono WAV; verify on a real iPhone.
+- Azure speech recognition writes numbers as digits (一杯 -> 1杯), so a spoken number won't string-match a target gap written in characters.
 - Level-1 replies are very short by design ("under 10 characters"); they can feel abrupt.
 - The model sometimes misses corrections; the server adds one for clear Mandarin words (是, 不, 他, 在, 看, 說, 們, 沒有, 什麼, 這, 那).
 - Rehearse has a keyword guardrail but no weekly limit for free users yet.
 - No native-speaker review has happened. Check `flagged_replies` and sample replies before launch.
 - Prompt caching probably doesn't kick in (static prompt is below Haiku's minimum). Cost only.
-- **Git:** `main` on https://github.com/ALacc776/gongla. Only M0 is pushed.
+- **Git:** `main` on https://github.com/ALacc776/gongla.
 - **Supabase account:** also holds two unrelated projects (ForgeSoftwareTeam4, coop-application-tracker). Only Gongla is linked. Do not touch the others.
