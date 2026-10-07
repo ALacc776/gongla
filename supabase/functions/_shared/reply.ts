@@ -78,6 +78,8 @@ export type ReplyContext = {
   spec: ScenarioSpec;
   level: number;
   memory: string[];
+  // Words the learner is fine saying in English: never recorded as gaps.
+  englishOk?: string[];
   targets: TargetGap[];
   // Opener only: due gaps the model may pick targets from (F5).
   candidates?: TargetGap[];
@@ -127,12 +129,15 @@ function replyTool(opener: boolean) {
     properties.gaps = {
       type: 'array',
       description:
-        "Words or phrases the learner said in English (or asked how to say) in their LAST message, with the natural Cantonese they could have used. Empty if they used only Cantonese or Jyutping. Do not include English loanwords Hong Kong people normally say in English (OK, check, sorry).",
+        "Every English word or phrase the learner said (or asked how to say) in their LAST message, with the natural Cantonese they could have used, even if Hong Kong people often say it in English. Skip words on the learner's OK-in-English list unless they asked how to say them. Empty if they used only Cantonese or Jyutping.",
       items: {
         type: 'object',
         properties: {
           english: { type: 'string', description: 'The English word or short phrase, lowercase' },
-          hanzi: { type: 'string', description: 'The natural Cantonese for it, Traditional characters, as short as possible' },
+          hanzi: {
+            type: 'string',
+            description: 'The natural Cantonese for it in Traditional characters, as short as possible. Never the English word itself.',
+          },
           source: { type: 'string', enum: ['fallback', 'asked'] },
         },
         required: ['english', 'hanzi', 'source'],
@@ -243,6 +248,9 @@ function dynamicPrompt(ctx: ReplyContext): string {
     `The learner is: ${spec.user_role}. Their goal: ${spec.goal}.`,
     `Beats to move through: ${spec.beats.join(', ')}`,
   );
+  if (ctx.englishOk?.length) {
+    parts.push(`The learner's OK-in-English list (don't add these to gaps unless they ask how to say one): ${ctx.englishOk.join(', ')}`);
+  }
   if (spec.key_phrases?.length) parts.push(`Useful phrases in this scene: ${spec.key_phrases.join(', ')}`);
   if (ctx.candidates) {
     if (spec.opener_hint) parts.push(`How to open: ${spec.opener_hint}`);

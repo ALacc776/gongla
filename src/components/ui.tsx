@@ -8,8 +8,10 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
   type ColorValue,
+  type TextInputProps,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
@@ -207,6 +209,11 @@ export function Row({
   );
 }
 
+// A plain text field for inside a Row, like the fields in Settings.
+export function TextField({ style, ...props }: TextInputProps) {
+  return <TextInput placeholderTextColor={colors.placeholder} style={[styles.textField, style]} {...props} />;
+}
+
 // A small round icon button: speaker, ask, and the like. 44pt touch target.
 export function IconButton({
   name,
@@ -363,6 +370,7 @@ const styles = StyleSheet.create({
   rowText: { flex: 1, gap: 2 },
   rowSubtitle: { ...type.footnote, color: colors.secondary },
   rowValue: { ...type.body, color: colors.secondary },
+  textField: { ...type.body, flex: 1, color: colors.text, paddingVertical: 0 },
 
   iconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
 

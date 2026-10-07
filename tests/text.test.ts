@@ -34,6 +34,11 @@ test('normalizeEnglish strips articles and punctuation', () => {
 
 test('normalizeHanzi drops punctuation and spaces', () => {
   assert.equal(normalizeHanzi(' 埋單！'), '埋單');
+  assert.equal(normalizeHanzi('我 想 埋單'), '我想埋單');
+});
+
+test('normalizeHanzi keeps the space between English words', () => {
+  assert.equal(normalizeHanzi('開 club  meeting。'), '開club meeting');
 });
 
 test('cantoneseRatio', () => {

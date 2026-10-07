@@ -67,6 +67,7 @@ export default function RootLayout() {
             <Stack.Screen name="summary" options={{ gestureEnabled: false }} />
             <Stack.Screen name="past-chats" options={withHeader('Past Chats')} />
             <Stack.Screen name="memory" options={withHeader('Memory')} />
+            <Stack.Screen name="english-ok" options={withHeader('OK in English')} />
             <Stack.Screen name="rehearse" options={withHeader('Rehearse')} />
             <Stack.Screen name="welcome" options={{ gestureEnabled: false, animation: 'fade' }} />
           </Stack>

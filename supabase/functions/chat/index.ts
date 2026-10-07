@@ -4,7 +4,7 @@ import { addGapEvents, markGapUsed, upsertGap, type GapEventKind } from '../_sha
 import { segmentJyutping } from '../_shared/jyutping.ts';
 import { cantonize, checkMandarin } from '../_shared/mandarin.ts';
 import { generateReply, replyText, type ChatTurn, type ScenarioSpec, type TargetGap } from '../_shared/reply.ts';
-import { analyzeInput, normalizeEnglish, normalizeHanzi } from '../_shared/text.ts';
+import { analyzeInput, hasHan, normalizeEnglish, normalizeHanzi } from '../_shared/text.ts';
 import { startTimer } from '../_shared/timing.ts';
 import { concatBytes, saveTts, toBase64, ttsHash, ttsParams, TTS_BUCKET } from '../_shared/tts-cache.ts';
 import { synthesizeStream } from '../_shared/azure.ts';
@@ -58,7 +58,7 @@ export default {
           .select('id, turn_count, ended_at, target_gap_ids, scenarios(spec)')
           .eq('id', session_id)
           .maybeSingle(),
-        ctx.supabase.from('profiles').select('level, memory').eq('id', userId).maybeSingle(),
+        ctx.supabase.from('profiles').select('level, memory, english_ok').eq('id', userId).maybeSingle(),
         ctx.supabase
           .from('messages')
           .select('id, role, text_raw')
@@ -90,6 +90,7 @@ export default {
     const usedThisSession = new Set((usedEvents ?? []).map((e: { gap_id: string }) => e.gap_id));
     // Targets already used this session drop out of the prompt so the scene moves on.
     const targets = ((targetRows ?? []) as TargetGap[]).filter((t) => !usedThisSession.has(t.id));
+    const englishOk: string[] = (profile?.english_ok ?? []).map(normalizeEnglish);
 
     // User turns as typed, assistant turns as hanzi only (saves tokens).
     const history: ChatTurn[] = recent.map((m) => ({ role: m.role, content: m.text_raw }));
@@ -146,6 +147,7 @@ export default {
               spec,
               level: profile?.level ?? 1,
               memory: profile?.memory?.facts ?? [],
+              englishOk,
               targets,
               wrapUp: session.turn_count + 1 >= TURN_CAP,
               learnerMandarin: checkMandarin(userText).hits,
@@ -182,6 +184,9 @@ export default {
           const hanzi = normalizeHanzi(g.hanzi);
           const english = normalizeEnglish(g.english);
           if (!hanzi || !english || gapChips.some((c) => c.hanzi === hanzi)) continue;
+          // Skip "translations" with no Chinese in them, and English the learner is fine using
+          // (unless they asked how to say it).
+          if (!hasHan(hanzi) || (g.source === 'fallback' && englishOk.includes(english))) continue;
           gapChips.push({ id: hanzi, english, hanzi, jyutping: segmentJyutping(hanzi), source: g.source });
           stuck.push({ english, hanzi, kind: g.source === 'asked' ? 'asked' : 'fallback' });
         }

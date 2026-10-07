@@ -21,6 +21,8 @@ export type Profile = {
   speech_rate: number;
   plan: 'free' | 'pro';
   memory: { facts: string[] };
+  // Words the learner is fine saying in English: no "Say it like this" card for these.
+  english_ok: string[];
 };
 
 export const PROFILE_KEY = ['profile'];
@@ -33,7 +35,7 @@ export function useProfile() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, level, display_prefs, voice, speech_rate, plan, memory')
+        .select('id, level, display_prefs, voice, speech_rate, plan, memory, english_ok')
         .eq('id', userId!)
         .single();
       if (error) throw error;

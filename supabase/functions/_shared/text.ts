@@ -41,9 +41,13 @@ export function normalizeEnglish(english: string): string {
     .trim();
 }
 
-// Keeps only Han characters and inner spaces trimmed: "單。" -> "單"
+// Drops punctuation and spaces, except one space between English words:
+// "埋單。" -> "埋單", "開 club meeting" -> "開club meeting"
 export function normalizeHanzi(hanzi: string): string {
-  return hanzi.replace(/[\s\p{P}]/gu, '').trim();
+  return hanzi
+    .replace(/[\s\p{P}]+/gu, ' ')
+    .trim()
+    .replace(/(?<![A-Za-z]) | (?![A-Za-z])/g, '');
 }
 
 // Share of the learner's messages that was Cantonese (F9):

@@ -120,6 +120,16 @@ export default function SettingsScreen() {
         />
       </Group>
 
+      <Group header="English" footer="Words you're happy to say in English. The chat won't suggest Cantonese for these.">
+        <Row
+          icon="character.bubble"
+          title="Words OK in English"
+          value={p ? String(p.english_ok.length) : undefined}
+          chevron
+          onPress={() => router.push('/english-ok')}
+        />
+      </Group>
+
       <Group
         header="Account"
         footer={
