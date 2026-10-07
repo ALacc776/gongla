@@ -59,3 +59,8 @@ export function cantoneseRatio(messages: string[]): number | null {
   const total = cantonese + english;
   return total === 0 ? null : cantonese / total;
 }
+
+// Whether a character reply asks the learner something, so they have a turn to take.
+export function hasQuestion(say: string): boolean {
+  return /[？?]/.test(say);
+}

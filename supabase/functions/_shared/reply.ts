@@ -2,6 +2,7 @@ import { callToolWithStats, streamToolWithStats, type CallStats, type ChatTurn, 
 import { segmentJyutping } from './jyutping.ts';
 import { checkMandarin, MANDARIN_THRESHOLD } from './mandarin.ts';
 import { extractClosedString } from './stream-json.ts';
+import { hasQuestion } from './text.ts';
 
 export type { ChatTurn } from './anthropic.ts';
 
@@ -15,7 +16,11 @@ export type Correction = {
   hanzi?: string;
 };
 
+// How the reply keeps the conversation going (question types from Huang et al. 2017).
+const MOVES = ['follow_up', 'partial_switch', 'full_switch', 'mirror', 'closing'] as const;
+
 type ReplyInput = {
+  move?: (typeof MOVES)[number];
   say?: string;
   segments: Segment[];
   english: string;
@@ -97,14 +102,20 @@ const SEGMENTS_SCHEMA = {
 };
 
 function replyTool(opener: boolean) {
-  // `say` comes first so it streams first: the app speaks it before the rest arrives.
+  // `say` streams early so the app speaks it before the rest arrives. Only the
+  // short `move` comes before it, so the model plans its closing question first.
   const properties: Record<string, unknown> = {
-    say: { type: 'string', description: 'Your whole reply, in Traditional characters. Write this first.' },
+    move: {
+      type: 'string',
+      enum: [...MOVES],
+      description: 'Which kind of question you will end your reply with. Decide this first.',
+    },
+    say: { type: 'string', description: 'Your whole reply, in Traditional characters, ending with your one question.' },
     segments: SEGMENTS_SCHEMA,
     english: { type: 'string', description: 'Natural English translation of your whole reply.' },
     goal_met: { type: 'boolean', description: "Whether the learner has now completed the scenario goal." },
   };
-  const required = ['say', 'segments', 'english', 'goal_met'];
+  const required = ['move', 'say', 'segments', 'english', 'goal_met'];
 
   if (opener) {
     properties.target_gap_ids = {
@@ -177,11 +188,37 @@ your reply), record it in "gaps" with source "asked", and carry on with the scen
 When the learner makes a Cantonese mistake, keep the conversation going and
 record at most 2 "corrections". Never point out mistakes in your reply itself.
 
+Keep the conversation going like two people chatting, not an interview:
+- You are a person with your own life that fits your character: your day so far,
+  your work, likes and dislikes, small complaints and stories. Make these up freely
+  to fit the setting and personality, and never contradict what you said earlier.
+- Have opinions. Give your own view on what the learner says: agree, gently
+  disagree, or compare with your own experience (我就覺得…, 我都係呀！, 唔係啩…).
+- Take turns sharing. Most replies include something about you (an opinion, a bit
+  of your day, a short story). Sometimes that is most of the reply and the question
+  is just a short tag (…你呢？). Match how much the learner shares, and open up a
+  little more as the chat goes on.
+- Shape: react to what they said, share your view or experience, then ask. The
+  question often grows out of what you shared (我最鍾意食菠蘿包，你呢？).
+- End every reply with exactly one question for the learner, never two. Pick its kind
+  in "move" before writing:
+  - follow_up (default, most common): ask more about what they just said: why,
+    how, what it was like, a specific detail.
+  - partial_switch: after 2 to 3 exchanges on one thing, or when the learner gives
+    very short answers, pick one detail they mentioned and open a related topic.
+  - full_switch (rare): only when the topic is used up. Bridge into it with 係呢,
+    講開又講 or 對喇, and tie it to the scene.
+  - mirror: if the learner asked you something, answer it first, then ask it back (咁你呢？).
+- Use switches to move the scene to its next beat.
+- Never ask about something the learner already answered in this chat.
+- Use natural Cantonese question forms: A-not-A (去唔去, 有冇, 係咪), 呢, 咩, 未呀,
+  點解, 點樣, 幾時. End the question with ？.
+
 Output only by calling the reply tool.`;
 
 const LEVEL_RULES: Record<number, string> = {
-  1: 'Replies of 1 short sentence, under 10 characters. Very common words only. Ask yes/no or either/or questions.',
-  2: 'Replies of 1 short sentence. Common everyday words. Ask simple questions.',
+  1: 'Replies of 1 short sentence, under 10 characters. Very common words only. Share a tiny fact or opinion, then ask a yes/no, either/or, or 你呢？ question.',
+  2: 'Replies of 1 to 2 short sentences: a simple share or opinion plus a simple question. Common everyday words.',
   3: 'Replies of 1 to 2 sentences. Everyday vocabulary. Open questions are fine.',
   4: 'Replies of 2 sentences. Broader vocabulary and natural phrasing.',
   5: 'Natural native speed and length. Slang and idioms welcome.',
@@ -220,7 +257,9 @@ function dynamicPrompt(ctx: ReplyContext): string {
       `Target words: try to create natural openings for the learner to say these.\nDo not say them yourself unless the learner is stuck twice.\n${gapList(ctx.targets)}`,
     );
   }
-  if (ctx.wrapUp) parts.push('The chat is nearly over: wrap up the scene naturally in this reply.');
+  if (ctx.wrapUp) {
+    parts.push('The chat is nearly over: wrap up the scene naturally in this reply. Use move "closing": say goodbye, no question needed.');
+  }
   if (ctx.learnerMandarin?.length) {
     parts.push(
       `The learner's last message uses Mandarin forms (${ctx.learnerMandarin.join(', ')}). Add a correction with the Cantonese form (e.g. 是 -> 係, 不 -> 唔, 的 -> 嘅, 他 -> 佢, 在 -> 喺, 看 -> 睇), but reply in character as if they had said it right.`,
@@ -275,6 +314,8 @@ export async function generateReply(
   onSay?: (say: string) => void,
 ): Promise<ReplyResult> {
   const calls: CallStats[] = [];
+  // Every reply ends with a question so the learner has a turn, except the goodbye.
+  const asksEnough = (say: string) => Boolean(ctx.wrapUp) || hasQuestion(say);
   let sayChecked = false;
   let sayEmitted = false;
   const onPartial = onSay
@@ -283,7 +324,7 @@ export async function generateReply(
         const say = extractClosedString(json, 'say');
         if (say === null) return;
         sayChecked = true;
-        if (say.trim() && checkMandarin(say).score < MANDARIN_THRESHOLD) {
+        if (say.trim() && checkMandarin(say).score < MANDARIN_THRESHOLD && asksEnough(say)) {
           sayEmitted = true;
           onSay(say.trim());
         }
@@ -292,26 +333,41 @@ export async function generateReply(
 
   let input = await callReply(ctx, history, calls, undefined, onPartial);
   let check = checkMandarin(sayOf(input));
+  let asks = asksEnough(sayOf(input));
 
-  // F4: regenerate once if the reply drifted into Mandarin.
-  if (check.score >= MANDARIN_THRESHOLD) {
-    console.warn('Mandarin leak, regenerating', check);
+  // F4: regenerate once if the reply drifted into Mandarin or left the learner nothing to answer.
+  if (check.score >= MANDARIN_THRESHOLD || !asks) {
+    console.warn('Reply needs a retry', { mandarin: check, asks });
+    const problems: string[] = [];
+    if (check.score >= MANDARIN_THRESHOLD) {
+      problems.push(
+        `it used Mandarin forms: ${check.hits.join(', ') || 'no Cantonese words at all'}. Write it in colloquial spoken Hong Kong Cantonese instead.`,
+      );
+    }
+    if (!asks) problems.push('it did not end with a question for the learner. End it with exactly one natural question.');
+    // Mandarin is the worse problem; ties go to the lower Mandarin score.
+    const badness = (c: typeof check, a: boolean) => (c.score >= MANDARIN_THRESHOLD ? 2 : 0) + (a ? 0 : 1);
     try {
       const retry = await callReply(
         ctx,
         history,
         calls,
-        `IMPORTANT: your previous draft of this reply used Mandarin forms: ${check.hits.join(', ') || 'no Cantonese words at all'}. Write it in colloquial spoken Hong Kong Cantonese instead.`,
+        `IMPORTANT: your previous draft of this reply had a problem: ${problems.join(' Also, ')}`,
       );
       const retryCheck = checkMandarin(sayOf(retry));
-      if (retryCheck.score <= check.score) {
+      const retryAsks = asksEnough(sayOf(retry));
+      const before = badness(check, asks);
+      const after = badness(retryCheck, retryAsks);
+      if (after < before || (after === before && retryCheck.score <= check.score)) {
         input = retry;
         check = retryCheck;
+        asks = retryAsks;
       }
     } catch (e) {
-      console.error('Mandarin retry failed', e);
+      console.error('Reply retry failed', e);
     }
   }
+  console.log('reply move', input.move ?? 'none', asks ? '' : '(no question)');
 
   const payload: ReplyPayload = {
     segments: input.segments.map((s) => ({

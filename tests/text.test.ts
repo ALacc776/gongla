@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import {
   analyzeInput,
   cantoneseRatio,
+  hasQuestion,
   normalizeEnglish,
   normalizeHanzi,
 } from '../supabase/functions/_shared/text.ts';
@@ -40,4 +41,10 @@ test('cantoneseRatio', () => {
   assert.equal(cantoneseRatio(['nei5 hou2']), 1);
   assert.equal(cantoneseRatio(['hello there']), 0);
   assert.equal(cantoneseRatio(['', '!!!']), null);
+});
+
+test('a reply with a full-width or ASCII question mark asks a question', () => {
+  assert.equal(hasQuestion('我鍾意飲奶茶，你呢？'), true);
+  assert.equal(hasQuestion('你今日點呀?'), true);
+  assert.equal(hasQuestion('好呀，我幫你落單。'), false);
 });
