@@ -3,6 +3,7 @@
 A mobile app for practicing spoken Hong Kong Cantonese by chatting with AI characters in roleplay scenarios. When the user gets stuck (English fallback, a mistake, a question, a tapped word), the app records a "gap" and brings it back in later chats until they can say it unprompted.
 
 - **Product and architecture reference:** [docs/design.md](docs/design.md). Read sections 3 (architecture), 4 (data model), 5 (feature specs) and 10 (build plan) before changing anything.
+- **Why it's built this way, in plain words:** [DESIGN_CHOICES.md](DESIGN_CHOICES.md). Update it whenever a big choice changes (instructions at the top).
 - **Working rules for AI agents:** [CLAUDE.md](CLAUDE.md). They are binding: never put API keys in the app, RLS on every table, build only the current milestone, ask before adding dependencies, and finish each task by telling the user exactly how to test it on their iPhone.
 
 ## Status
