@@ -159,7 +159,7 @@ export async function transcribe(fileUri: string) {
   });
   const json = await res.json().catch(() => null);
   if (!res.ok) throw new ApiError(json?.error ?? 'Could not understand the audio', res.status, json?.reason ?? null);
-  return json as { text: string };
+  return json as { text: string; status: string; seconds: number; peak: number };
 }
 
 export function deleteAccount() {

@@ -52,8 +52,11 @@ export async function synthesize(text: string, voice: string, rate: number, form
   return new Uint8Array(await new Response(await synthesizeStream(text, voice, rate, format)).arrayBuffer());
 }
 
-// Short-audio recognition: up to 60 s of 16 kHz mono WAV.
-export async function recognize(wav: Uint8Array): Promise<string> {
+export type Recognition = { text: string; status: string };
+
+// Short-audio recognition: up to 60 s of 16 kHz mono WAV. `status` is Azure's
+// RecognitionStatus (Success, NoMatch, InitialSilenceTimeout, ...).
+export async function recognize(wav: Uint8Array): Promise<Recognition> {
   const { key, region } = config();
   const res = await fetch(
     `https://${region}.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1?language=zh-HK&format=simple`,
@@ -72,6 +75,8 @@ export async function recognize(wav: Uint8Array): Promise<string> {
     throw new Error('The speech service failed. Try again.');
   }
   const json = await res.json();
-  if (json.RecognitionStatus !== 'Success') return '';
-  return (json.DisplayText ?? '').trim();
+  return {
+    text: json.RecognitionStatus === 'Success' ? (json.DisplayText ?? '').trim() : '',
+    status: json.RecognitionStatus ?? 'Unknown',
+  };
 }

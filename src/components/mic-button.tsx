@@ -31,6 +31,8 @@ const RECORDING: RecordingOptions = {
 };
 
 const MIN_RECORDING_MS = 400;
+// People let go a moment before they finish the last syllable.
+const TAIL_MS = 300;
 // A press shorter than this is a tap: recording keeps going until the next tap.
 const TAP_MS = 350;
 
@@ -48,7 +50,7 @@ type Props = {
 // before it's ready is remembered instead of lost.
 export function MicButton({ disabled, onTranscript, onListeningChange }: Props) {
   const recorder = useAudioRecorder(RECORDING);
-  const [ui, setUi] = useState<'idle' | 'recording' | 'working'>('idle');
+  const [ui, setUi] = useState<Phase>('idle');
   const phase = useRef<Phase>('idle');
   const pressedAt = useRef(0);
   const recordingSince = useRef(0);
@@ -57,8 +59,8 @@ export function MicButton({ disabled, onTranscript, onListeningChange }: Props) 
 
   function setPhase(next: Phase) {
     phase.current = next;
-    setUi(next === 'recording' || next === 'starting' ? 'recording' : next === 'stopping' ? 'working' : 'idle');
-    onListeningChange?.(next === 'recording' || next === 'starting');
+    setUi(next);
+    onListeningChange?.(next === 'recording');
   }
 
   async function start() {
@@ -88,14 +90,15 @@ export function MicButton({ disabled, onTranscript, onListeningChange }: Props) 
   async function stop() {
     if (phase.current !== 'recording') return;
     setPhase('stopping');
+    await new Promise((r) => setTimeout(r, TAIL_MS));
     const stoppedAt = Date.now();
     try {
       await recorder.stop();
       await setPlaybackMode();
       if (stoppedAt - recordingSince.current < MIN_RECORDING_MS || !recorder.uri) return;
-      const { text } = await transcribe(recorder.uri);
-      if (text) onTranscript(text, Date.now() - stoppedAt);
-      else Alert.alert("Didn't catch that", 'Try again a little closer to the mic.');
+      const result = await transcribe(recorder.uri);
+      if (result.text) onTranscript(result.text, Date.now() - stoppedAt);
+      else Alert.alert("Didn't catch that", emptyReason(result));
     } catch (e) {
       Alert.alert("Couldn't hear that", (e as Error).message);
     } finally {
@@ -128,18 +131,31 @@ export function MicButton({ disabled, onTranscript, onListeningChange }: Props) 
 
   return (
     <Pressable
-      disabled={disabled || ui === 'working'}
+      disabled={disabled || ui === 'stopping'}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
       style={[styles.button, ui === 'recording' && styles.recording, disabled && styles.disabled]}
       accessibilityLabel={ui === 'recording' ? 'Stop and send' : 'Hold or tap to talk'}>
-      {ui === 'working' ? (
+      {ui === 'stopping' ? (
         <ActivityIndicator color="#FFFFFF" />
       ) : (
-        <Text style={styles.label}>{ui === 'recording' ? '●' : '🎙'}</Text>
+        // "…" while the mic gets ready: start speaking when it turns ●.
+        <Text style={styles.label}>{ui === 'recording' ? '●' : ui === 'starting' ? '…' : '🎙'}</Text>
       )}
     </Pressable>
   );
+}
+
+// Why nothing was recognised, from what the server measured in the recording.
+function emptyReason({ status, seconds, peak }: { status: string; seconds: number; peak: number }) {
+  if (peak < 0.01) {
+    return 'The recording was silent. Check that Expo Go is allowed to use the microphone (iPhone Settings → Expo Go), and start speaking once the button turns ●.';
+  }
+  if (seconds < 1) return 'That was very short. Start speaking once the button turns ●, and let go when you finish.';
+  if (peak < 0.1 || status === 'InitialSilenceTimeout') {
+    return 'It was very quiet. Hold the phone closer and speak up a little.';
+  }
+  return `It heard you but couldn't make out the words (${seconds}s, ${status}). Try again a little slower, or type it.`;
 }
 
 const styles = StyleSheet.create({
