@@ -1,6 +1,7 @@
-import { callToolWithStats, type CallStats, type ChatTurn, type SystemBlock } from './anthropic.ts';
+import { callToolWithStats, streamToolWithStats, type CallStats, type ChatTurn, type SystemBlock } from './anthropic.ts';
 import { segmentJyutping } from './jyutping.ts';
 import { checkMandarin, MANDARIN_THRESHOLD } from './mandarin.ts';
+import { extractClosedString } from './stream-json.ts';
 
 export type { ChatTurn } from './anthropic.ts';
 
@@ -15,6 +16,7 @@ export type Correction = {
 };
 
 type ReplyInput = {
+  say?: string;
   segments: Segment[];
   english: string;
   gaps?: ModelGap[];
@@ -36,6 +38,9 @@ export type ReplyPayload = {
 export type ReplyResult = {
   // One entry per model call (2 if the Mandarin check forced a retry).
   calls: CallStats[];
+  // The whole reply as one string (what gets spoken), and whether onSay already got it.
+  say: string;
+  sayEmitted: boolean;
   payload: ReplyPayload;
   gaps: ModelGap[];
   corrections: Correction[];
@@ -80,7 +85,7 @@ export type ReplyContext = {
 const SEGMENTS_SCHEMA = {
   type: 'array',
   description:
-    'Your reply split into word-sized chunks (1 to 4 characters each, punctuation as its own chunk with an empty gloss). Joined together they must equal the full reply.',
+    'The same reply as `say`, split into word-sized chunks (1 to 4 characters each, punctuation as its own chunk with an empty gloss). Joined together they must equal `say` exactly.',
   items: {
     type: 'object',
     properties: {
@@ -92,12 +97,14 @@ const SEGMENTS_SCHEMA = {
 };
 
 function replyTool(opener: boolean) {
+  // `say` comes first so it streams first: the app speaks it before the rest arrives.
   const properties: Record<string, unknown> = {
+    say: { type: 'string', description: 'Your whole reply, in Traditional characters. Write this first.' },
     segments: SEGMENTS_SCHEMA,
     english: { type: 'string', description: 'Natural English translation of your whole reply.' },
     goal_met: { type: 'boolean', description: "Whether the learner has now completed the scenario goal." },
   };
-  const required = ['segments', 'english', 'goal_met'];
+  const required = ['say', 'segments', 'english', 'goal_met'];
 
   if (opener) {
     properties.target_gap_ids = {
@@ -232,17 +239,22 @@ function withLeadingUserTurn(turns: ChatTurn[]): ChatTurn[] {
     : turns;
 }
 
-async function callReply(ctx: ReplyContext, history: ChatTurn[], calls: CallStats[], extraSystem?: string) {
+async function callReply(
+  ctx: ReplyContext,
+  history: ChatTurn[],
+  calls: CallStats[],
+  extraSystem?: string,
+  onPartial?: (json: string) => void,
+) {
   const system: SystemBlock[] = [
     { type: 'text', text: STATIC_PROMPT, cache_control: { type: 'ephemeral' } },
     { type: 'text', text: dynamicPrompt(ctx) },
   ];
   if (extraSystem) system.push({ type: 'text', text: extraSystem });
-  const { input, stats } = await callToolWithStats<ReplyInput>({
-    system,
-    messages: withLeadingUserTurn(history),
-    tool: replyTool(Boolean(ctx.candidates)),
-  });
+  const options = { system, messages: withLeadingUserTurn(history), tool: replyTool(Boolean(ctx.candidates)) };
+  const { input, stats } = onPartial
+    ? await streamToolWithStats<ReplyInput>(options, onPartial)
+    : await callToolWithStats<ReplyInput>(options);
   calls.push(stats);
   if (!Array.isArray(input.segments) || input.segments.length === 0) {
     throw new Error('The AI returned an unexpected reply. Try again.');
@@ -250,10 +262,36 @@ async function callReply(ctx: ReplyContext, history: ChatTurn[], calls: CallStat
   return input;
 }
 
-export async function generateReply(ctx: ReplyContext, history: ChatTurn[]): Promise<ReplyResult> {
+function sayOf(input: ReplyInput): string {
+  return (input.say ?? '').trim() || input.segments.map((s) => s.hanzi).join('');
+}
+
+// With onSay, the model call streams and onSay gets the spoken reply as soon as it
+// has fully arrived and passed the Mandarin check, before the glosses and gaps.
+// A reply that fails the check is not emitted; the caller sends `say` from the result.
+export async function generateReply(
+  ctx: ReplyContext,
+  history: ChatTurn[],
+  onSay?: (say: string) => void,
+): Promise<ReplyResult> {
   const calls: CallStats[] = [];
-  let input = await callReply(ctx, history, calls);
-  let check = checkMandarin(input.segments.map((s) => s.hanzi).join(''));
+  let sayChecked = false;
+  let sayEmitted = false;
+  const onPartial = onSay
+    ? (json: string) => {
+        if (sayChecked) return;
+        const say = extractClosedString(json, 'say');
+        if (say === null) return;
+        sayChecked = true;
+        if (say.trim() && checkMandarin(say).score < MANDARIN_THRESHOLD) {
+          sayEmitted = true;
+          onSay(say.trim());
+        }
+      }
+    : undefined;
+
+  let input = await callReply(ctx, history, calls, undefined, onPartial);
+  let check = checkMandarin(sayOf(input));
 
   // F4: regenerate once if the reply drifted into Mandarin.
   if (check.score >= MANDARIN_THRESHOLD) {
@@ -265,7 +303,7 @@ export async function generateReply(ctx: ReplyContext, history: ChatTurn[]): Pro
         calls,
         `IMPORTANT: your previous draft of this reply used Mandarin forms: ${check.hits.join(', ') || 'no Cantonese words at all'}. Write it in colloquial spoken Hong Kong Cantonese instead.`,
       );
-      const retryCheck = checkMandarin(retry.segments.map((s) => s.hanzi).join(''));
+      const retryCheck = checkMandarin(sayOf(retry));
       if (retryCheck.score <= check.score) {
         input = retry;
         check = retryCheck;
@@ -291,6 +329,8 @@ export async function generateReply(ctx: ReplyContext, history: ChatTurn[]): Pro
 
   return {
     calls,
+    say: sayOf(input),
+    sayEmitted,
     payload,
     gaps: Array.isArray(input.gaps) ? input.gaps : [],
     corrections: Array.isArray(input.corrections) ? input.corrections.slice(0, 2) : [],

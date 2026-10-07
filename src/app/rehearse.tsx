@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { endSession, generateScenario, startCustomSession } from '@/lib/api';
+import { useVoiceSettings } from '@/lib/audio';
 import { useOpenSession } from '@/lib/start-chat';
 import { colors } from '@/lib/theme';
 import type { ScenarioSpec } from '@/lib/types';
@@ -15,6 +16,7 @@ export default function RehearseScreen() {
   const { description } = useLocalSearchParams<{ description: string }>();
   const queryClient = useQueryClient();
   const open = useOpenSession();
+  const { rate } = useVoiceSettings();
   const [spec, setSpec] = useState<Spec | null>(null);
   const [editing, setEditing] = useState(false);
   const [edit, setEdit] = useState('');
@@ -32,7 +34,7 @@ export default function RehearseScreen() {
   const start = useMutation({
     mutationFn: async () => {
       if (open.data) await endSession(open.data.id);
-      return startCustomSession(spec!);
+      return startCustomSession(spec!, rate);
     },
     onSuccess: ({ session_id }) => {
       queryClient.invalidateQueries({ queryKey: ['sessions'] });

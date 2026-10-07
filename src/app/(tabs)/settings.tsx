@@ -103,6 +103,17 @@ export default function SettingsScreen() {
             trackColor={{ true: colors.accent }}
           />
         </Row>
+        <Row label="Send automatically after speaking">
+          <Switch
+            value={display.autoSend}
+            onValueChange={(autoSend) => display.set({ autoSend })}
+            trackColor={{ true: colors.accent }}
+          />
+        </Row>
+        <Text style={styles.hint}>
+          Off: what the mic heard goes into the text box so you can check it first. Replies to things you say
+          out loud always play.
+        </Text>
         <Pressable onPress={() => speak('你好，我哋一齊練習講廣東話啦！')}>
           <Text style={styles.link}>Test the voice 🔊</Text>
         </Pressable>

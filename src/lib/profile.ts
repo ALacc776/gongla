@@ -9,6 +9,7 @@ export type DisplayPrefs = {
   english: boolean;
   tone_colors?: boolean;
   autoplay?: boolean;
+  auto_send?: boolean;
   onboarded?: boolean;
 };
 

@@ -20,7 +20,7 @@ import { LimitNotice } from '@/components/limit-notice';
 import { MessageBubble, TypingBubble } from '@/components/message-bubble';
 import { MicButton } from '@/components/mic-button';
 import { ApiError, sendChat, tapGap } from '@/lib/api';
-import { useSpeaker } from '@/lib/audio';
+import { receiveClip, useSpeaker, useVoiceSettings, warmUpAudio } from '@/lib/audio';
 import { routeInput } from '@/lib/btw';
 import { useDisplayStore } from '@/lib/display-store';
 import { formatSeconds, SHOW_TIMINGS, usePerfStore } from '@/lib/perf-store';
@@ -44,6 +44,8 @@ export default function ChatScreen() {
   const [askOpen, setAskOpen] = useState(false);
   const [askQuestion, setAskQuestion] = useState<string | null>(null);
   const [turnCapped, setTurnCapped] = useState(false);
+  // The reply while it streams in: its text arrives before the glosses and gaps.
+  const [streamingReply, setStreamingReply] = useState<{ id: string; hanzi: string } | null>(null);
 
   const session = useQuery({
     queryKey: ['session', sessionId],
@@ -56,6 +58,7 @@ export default function ChatScreen() {
   const spec = session.data?.scenarios?.spec;
   const readOnly = !!session.data?.ended_at;
   const speak = useSpeaker(spec?.character.voice);
+  const voiceSettings = useVoiceSettings(spec?.character.voice);
 
   const messagesKey = ['messages', sessionId];
   const messages = useQuery({
@@ -71,46 +74,75 @@ export default function ChatScreen() {
     },
   });
 
-  // Auto-play the opening line and each new reply when the setting is on.
-  const lastPlayed = useRef<string | null>(null);
+  // Replies already spoken (or that shouldn't be), so nothing plays twice.
+  const played = useRef<Set<string> | null>(null);
+  // Auto-play the opening line when the setting is on. Replies are spoken as they
+  // stream in (see send), and a reopened chat doesn't replay old messages.
   useEffect(() => {
-    const last = messages.data?.at(-1);
-    if (!display.autoplay || readOnly || !last || last.role !== 'assistant') return;
-    if (lastPlayed.current === null && messages.data!.length > 1) {
-      lastPlayed.current = last.id; // Reopened chat: don't replay old messages.
-      return;
+    if (!messages.data || readOnly) return;
+    if (played.current === null) {
+      played.current = new Set(messages.data.length > 1 ? messages.data.map((m) => m.id) : []);
     }
-    if (lastPlayed.current !== last.id) {
-      lastPlayed.current = last.id;
-      speak(last.text_raw);
-    }
+    const last = messages.data.at(-1);
+    if (!display.autoplay || !last || last.role !== 'assistant' || played.current.has(last.id)) return;
+    played.current.add(last.id);
+    speak(last.text_raw);
   }, [messages.data, display.autoplay, readOnly, speak]);
+
+  useEffect(() => {
+    warmUpAudio().catch(() => {});
+  }, []);
 
   const perf = usePerfStore();
   // How long the last voice recording took to turn into text; attached to the next sent message.
   const heardMs = useRef<number | null>(null);
 
   const send = useMutation({
-    mutationFn: async (text: string) => {
+    mutationFn: ({ text, spoken }: { text: string; spoken: boolean }) => {
       const started = Date.now();
-      const result = await sendChat(sessionId, text);
-      return { ...result, ms: Date.now() - started };
+      // A turn you spoke always answers out loud; its voice streams in with the reply.
+      const wantVoice = spoken || display.autoplay;
+      let clip: ReturnType<typeof receiveClip> | null = null;
+      let sayText = '';
+      return sendChat(
+        sessionId,
+        text,
+        {
+          onSay: (say) => {
+            perf.record('reply', say.message_id, Date.now() - started);
+            setStreamingReply({ id: say.message_id, hanzi: say.hanzi });
+            played.current?.add(say.message_id);
+            sayText = say.hanzi;
+            if (wantVoice) clip = receiveClip(say.hanzi, voiceSettings);
+          },
+          onAudio: (b64) => clip?.append(b64),
+          onAudioEnd: () => {
+            clip?.play().then((ok) => {
+              if (!ok) speak(sayText);
+            });
+          },
+          onAudioError: () => speak(sayText),
+        },
+        wantVoice ? voiceSettings : undefined,
+      );
     },
-    onSuccess: ({ user_message, message, turn_count, turn_cap, ms }) => {
-      perf.record('reply', message.id, ms);
+    onSuccess: ({ user_message, message, turn_count, turn_cap }) => {
       if (heardMs.current !== null) perf.record('heard', user_message.id, heardMs.current);
       heardMs.current = null;
       queryClient.setQueryData<ChatMessage[]>(messagesKey, (old = []) => [...old, user_message, message]);
       queryClient.invalidateQueries({ queryKey: ['gaps'] });
       if (turn_count >= turn_cap) setTurnCapped(true);
     },
-    onError: (_error, text) => setDraft(text),
-    onSettled: () => setPendingText(null),
+    onError: (_error, { text }) => setDraft(text),
+    onSettled: () => {
+      setPendingText(null);
+      setStreamingReply(null);
+    },
   });
 
-  function submit() {
-    if (!draft.trim() || send.isPending) return;
-    const route = routeInput(draft);
+  function submit(raw = draft, spoken = false) {
+    if (!raw.trim() || send.isPending) return;
+    const route = routeInput(raw);
     setDraft('');
     if (route.kind === 'ask') {
       // F16: /btw goes to the tutor, never to the character.
@@ -119,7 +151,15 @@ export default function ChatScreen() {
       return;
     }
     setPendingText(route.text);
-    send.mutate(route.text);
+    send.mutate({ text: route.text, spoken });
+  }
+
+  // F14: what the mic heard. Sent straight away when auto-send is on, unless
+  // something is already typed, in which case it is added for checking.
+  function onTranscript(text: string, ms: number) {
+    heardMs.current = ms;
+    if (display.autoSend && !draft.trim()) submit(text, true);
+    else setDraft((d) => (d ? `${d} ${text}` : text));
   }
 
   function onTapSegment(messageId: string, index: number, hanzi: string) {
@@ -153,10 +193,19 @@ export default function ChatScreen() {
   const limited = send.error instanceof ApiError && send.error.reason === 'daily_limit';
 
   // The list is inverted so it stays pinned to the newest message.
-  const items = [
+  const items: ChatMessage[] = [
     ...(messages.data ?? []),
-    ...(pendingText
-      ? [{ id: 'pending', role: 'user' as const, text_raw: pendingText, payload: null, created_at: '' }]
+    ...(pendingText ? [{ id: 'pending', role: 'user' as const, text_raw: pendingText, payload: null, created_at: '' }] : []),
+    ...(streamingReply
+      ? [
+          {
+            id: streamingReply.id,
+            role: 'assistant' as const,
+            text_raw: streamingReply.hanzi,
+            payload: { segments: [{ hanzi: streamingReply.hanzi, gloss: '', jyutping: '' }], english: '', goal_met: false },
+            created_at: '',
+          },
+        ]
       : []),
   ].reverse();
 
@@ -208,12 +257,12 @@ export default function ChatScreen() {
             contentContainerStyle={styles.list}
             keyboardDismissMode="interactive"
             keyboardShouldPersistTaps="handled"
-            ListHeaderComponent={send.isPending ? <TypingBubble /> : null}
+            ListHeaderComponent={send.isPending && !streamingReply ? <TypingBubble /> : null}
             renderItem={({ item }) => (
               <MessageBubble
                 message={item}
                 timing={SHOW_TIMINGS ? timingLine(item) : undefined}
-                onTapSegment={item.id === 'pending' || readOnly ? undefined : onTapSegment}
+                onTapSegment={item.id === 'pending' || item.id === streamingReply?.id || readOnly ? undefined : onTapSegment}
                 onPlay={speak}
               />
             )}
@@ -266,16 +315,13 @@ export default function ChatScreen() {
               <Pressable
                 style={[styles.sendButton, send.isPending && styles.sendDisabled]}
                 disabled={send.isPending}
-                onPress={submit}>
+                onPress={() => submit()}>
                 <Text style={styles.sendText}>Send</Text>
               </Pressable>
             ) : (
               <MicButton
                 disabled={send.isPending || limited || turnCapped}
-                onTranscript={(text, ms) => {
-                  heardMs.current = ms;
-                  setDraft((d) => (d ? `${d} ${text}` : text));
-                }}
+                onTranscript={onTranscript}
               />
             )}
           </View>

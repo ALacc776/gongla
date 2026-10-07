@@ -15,6 +15,10 @@ export function startTimer() {
     add(name: string, ms: number) {
       marks[name] = (marks[name] ?? 0) + Math.round(ms);
     },
+    // Milliseconds since the timer started.
+    elapsed(): number {
+      return Math.round(performance.now() - start);
+    },
     done(): Record<string, number> {
       return { ...marks, total: Math.round(performance.now() - start) };
     },

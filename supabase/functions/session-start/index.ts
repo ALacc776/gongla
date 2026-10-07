@@ -3,6 +3,9 @@ import { withSupabase } from 'npm:@supabase/server@1';
 import { generateReply, replyText, type ScenarioSpec, type TargetGap } from '../_shared/reply.ts';
 import { validSpec } from '../_shared/spec.ts';
 import { startTimer } from '../_shared/timing.ts';
+import { toBase64, ttsBytes, ttsParams } from '../_shared/tts-cache.ts';
+
+declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
 const CANDIDATE_LIMIT = 15;
 const TARGET_LIMIT = 5;
@@ -13,7 +16,8 @@ export default {
     const userId = ctx.userClaims?.id;
     if (!userId) return Response.json({ error: 'Not signed in' }, { status: 401 });
 
-    const { scenario_id, custom_spec } = await req.json().catch(() => ({}));
+    // rate: the learner's speech speed, so the opener's voice can come back with it.
+    const { scenario_id, custom_spec, rate } = await req.json().catch(() => ({}));
 
     let scenario: { id: string; spec: unknown } | null = null;
     if (custom_spec !== undefined) {
@@ -55,21 +59,38 @@ export default {
     const candidates = (due ?? []) as TargetGap[];
     timer.mark('db_load');
 
+    // The opener's voice is made while the rest of the reply (glosses) is still
+    // being written, and comes back in the same response.
+    const spec = scenario.spec as ScenarioSpec;
+    let audio: Promise<{ text: string; voice: string; rate: number; b64: string } | null> = Promise.resolve(null);
+    const startAudio = (say: string) => {
+      const params = ttsParams({ text: say, voice: spec.character.voice, rate });
+      if (!params) return;
+      audio = ttsBytes(ctx.supabaseAdmin, userId, params, (work) => EdgeRuntime.waitUntil(work))
+        .then((bytes) => ({ text: params.text, voice: params.voice, rate: params.rate, b64: toBase64(bytes) }))
+        .catch((e) => {
+          console.error('opener audio failed', e);
+          return null;
+        });
+    };
+
     let result;
     try {
       result = await generateReply(
         {
-          spec: scenario.spec as ScenarioSpec,
+          spec,
           level: profile?.level ?? 1,
           memory: profile?.memory?.facts ?? [],
           targets: [],
           candidates,
         },
         [],
+        startAudio,
       );
     } catch (e) {
       return Response.json({ error: (e as Error).message }, { status: 502 });
     }
+    if (!result.sayEmitted) startAudio(result.say);
 
     timer.mark('model');
     const candidateIds = new Set(candidates.map((c) => c.id));
@@ -105,9 +126,12 @@ export default {
     if (messageError) return Response.json({ error: 'Could not save the message' }, { status: 500 });
 
     timer.mark('save');
+    const voice = await audio;
+    timer.mark('audio');
     return Response.json({
       session_id: session.id,
       scenario_id: scenario.id,
+      audio: voice,
       message,
       target_count: targetIds.length,
       timings: { ...timer.done(), model_calls: result.calls.length, output_tokens: result.calls.reduce((n, c) => n + c.output_tokens, 0) },

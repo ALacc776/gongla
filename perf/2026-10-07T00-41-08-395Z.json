@@ -1,0 +1,215 @@
+{
+  "date": "2026-10-07T00:41:08.406Z",
+  "turns": 6,
+  "summary": {
+    "turn_total": {
+      "median": 2951,
+      "worst": 4075
+    },
+    "stt": 812,
+    "chat": 1253,
+    "tts": 876,
+    "download": 0,
+    "chat_server": {
+      "db_load": 122,
+      "usage": null,
+      "model": 660,
+      "gaps": null,
+      "save": 88,
+      "total": 2102,
+      "output_tokens": 214
+    },
+    "stt_server": {
+      "azure": 557,
+      "total": 558
+    },
+    "tts_server": {
+      "azure": null,
+      "upload": null,
+      "total": null
+    },
+    "chat_done": 2693,
+    "opener": {
+      "session_start": 2985,
+      "tts": 1354,
+      "total": 4339
+    },
+    "mandarin_retries": 0
+  },
+  "detail": [
+    {
+      "heard": "兩位唔該。",
+      "reply": "跟我嚟。",
+      "stt_ms": 1094,
+      "chat_ms": 1968,
+      "chat_done_ms": 3109,
+      "tts_ms": 1013,
+      "audio_bytes": 12096,
+      "download_ms": 0,
+      "total_ms": 4075,
+      "server": {
+        "stt": {
+          "upload": 1,
+          "azure": 622,
+          "total": 623,
+          "audio_bytes": 77244
+        },
+        "chat": {
+          "db_load": 130,
+          "model": 653,
+          "save": 89,
+          "total": 1925,
+          "say": 783,
+          "model_calls": 1,
+          "output_tokens": 194
+        },
+        "tts": {}
+      }
+    },
+    {
+      "heard": "我想要一個菠蘿包。",
+      "reply": "菠蘿包得啦。飲咩？",
+      "stt_ms": 995,
+      "chat_ms": 1281,
+      "chat_done_ms": 3105,
+      "tts_ms": 864,
+      "audio_bytes": 24912,
+      "download_ms": 0,
+      "total_ms": 3140,
+      "server": {
+        "stt": {
+          "upload": 1,
+          "azure": 658,
+          "total": 659,
+          "audio_bytes": 83644
+        },
+        "chat": {
+          "db_load": 119,
+          "model": 780,
+          "save": 78,
+          "total": 2786,
+          "say": 899,
+          "model_calls": 1,
+          "output_tokens": 322
+        },
+        "tts": {}
+      }
+    },
+    {
+      "heard": "凍檸茶少甜。",
+      "reply": "得，凍檸茶少甜。",
+      "stt_ms": 858,
+      "chat_ms": 1174,
+      "chat_done_ms": 2559,
+      "tts_ms": 929,
+      "audio_bytes": 18288,
+      "download_ms": 0,
+      "total_ms": 2961,
+      "server": {
+        "stt": {
+          "upload": 1,
+          "azure": 614,
+          "total": 615,
+          "audio_bytes": 78844
+        },
+        "chat": {
+          "db_load": 124,
+          "model": 666,
+          "save": 87,
+          "total": 2169,
+          "say": 790,
+          "model_calls": 1,
+          "output_tokens": 229
+        },
+        "tts": {}
+      }
+    },
+    {
+      "heard": "幾多錢呀？",
+      "reply": "埋單啦？",
+      "stt_ms": 659,
+      "chat_ms": 1224,
+      "chat_done_ms": 2488,
+      "tts_ms": 749,
+      "audio_bytes": 12672,
+      "download_ms": 0,
+      "total_ms": 2632,
+      "server": {
+        "stt": {
+          "upload": 1,
+          "azure": 461,
+          "total": 462,
+          "audio_bytes": 58444
+        },
+        "chat": {
+          "db_load": 136,
+          "model": 617,
+          "save": 90,
+          "total": 2035,
+          "say": 753,
+          "model_calls": 1,
+          "output_tokens": 198
+        },
+        "tts": {}
+      }
+    },
+    {
+      "heard": "唔該埋單？",
+      "reply": "得啦。",
+      "stt_ms": 728,
+      "chat_ms": 1138,
+      "chat_done_ms": 2302,
+      "tts_ms": 596,
+      "audio_bytes": 11232,
+      "download_ms": 0,
+      "total_ms": 2462,
+      "server": {
+        "stt": {
+          "upload": 1,
+          "azure": 500,
+          "total": 501,
+          "audio_bytes": 62044
+        },
+        "chat": {
+          "db_load": 107,
+          "model": 641,
+          "save": 97,
+          "total": 1911,
+          "say": 748,
+          "model_calls": 1,
+          "output_tokens": 173
+        },
+        "tts": {}
+      }
+    },
+    {
+      "heard": "有冇奶茶？",
+      "reply": "有啦，要唔要？",
+      "stt_ms": 765,
+      "chat_ms": 1288,
+      "chat_done_ms": 2827,
+      "tts_ms": 887,
+      "audio_bytes": 17280,
+      "download_ms": 0,
+      "total_ms": 2940,
+      "server": {
+        "stt": {
+          "upload": 1,
+          "azure": 483,
+          "total": 485,
+          "audio_bytes": 60044
+        },
+        "chat": {
+          "db_load": 104,
+          "model": 791,
+          "save": 83,
+          "total": 2433,
+          "say": 895,
+          "model_calls": 1,
+          "output_tokens": 259
+        },
+        "tts": {}
+      }
+    }
+  ]
+}

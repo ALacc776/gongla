@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { Alert } from 'react-native';
 
 import { endSession, startSession } from '@/lib/api';
+import { useVoiceSettings } from '@/lib/audio';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { SESSION_COLUMNS, type SessionRow } from '@/lib/types';
@@ -32,11 +33,12 @@ export function useOpenSession() {
 export function useStartChat() {
   const queryClient = useQueryClient();
   const open = useOpenSession();
+  const { rate } = useVoiceSettings();
 
   const mutation = useMutation({
     mutationFn: async (scenarioId: string) => {
       if (open.data) await endSession(open.data.id);
-      return startSession(scenarioId);
+      return startSession(scenarioId, rate);
     },
     onSuccess: ({ session_id }) => {
       queryClient.invalidateQueries({ queryKey: ['sessions'] });

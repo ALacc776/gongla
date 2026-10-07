@@ -22,7 +22,7 @@ A mobile app for practicing spoken Hong Kong Cantonese by chatting with AI chara
 ## Stack
 
 - Expo SDK 57 (managed workflow), Expo Router, TypeScript strict
-- `@supabase/supabase-js`, `expo-secure-store` (auth session, chunked), `@tanstack/react-query`, `zustand`, `expo-audio` (playback and recording)
+- `@supabase/supabase-js`, `expo-secure-store` (auth session, chunked), `@tanstack/react-query`, `zustand`, `expo-audio` (playback and recording), `expo-file-system` (voice clip cache)
 - Supabase hosted project `gukiiwozjyrxzzvrdzkn` (Postgres, Auth, Edge Functions, Storage). There is no local Supabase or Docker setup.
 - Anthropic `claude-haiku-4-5-20251001`, called only from Edge Functions, with forced tool use
 - Azure AI Speech `zh-HK` (TTS and short-audio STT) over REST, only from Edge Functions
@@ -100,11 +100,11 @@ Auth: **anonymous sign-ins must be enabled** (Dashboard → Authentication → S
 All use `withSupabase({ auth: 'user' })`. Reads go through the caller's RLS (`ctx.supabase`).
 
 - **`session-start { scenario_id } | { custom_spec }`**: picks up to 5 target gaps from 15 due candidates (the opener call chooses), generates the opening line. `custom_spec` saves a Rehearse scenario first.
-- **`chat { session_id, text }`**: counts usage (429 `daily_limit`), calls Claude, Mandarin check with one regeneration, Jyutping per segment, upserts gaps (fallback / asked / corrected, plus a deterministic Mandarin correction if the model missed one), marks targets used (model or string match, not if the character said it in its last 2 messages), recognition gaps used, saves both messages.
+- **`chat { session_id, text, speak?, voice?, rate? }`**: streams NDJSON (`say`, `audio`/`audio_end`, `done`, `error`). Counts usage via `take_usage()` (429 `daily_limit`), streams Claude, Mandarin check on `say` (one regeneration if needed), Jyutping per segment, saves both messages, then records gaps (fallback / asked / corrected, plus a deterministic Mandarin correction), used targets (model or string match, not parroted) and recognition gaps in the background.
 - **`session-end { session_id }`**: Cantonese ratio, new/used gaps, goal met, 7-day average, level suggestion, then updates learner memory in the background (`EdgeRuntime.waitUntil`) when the chat had 4+ user messages. Idempotent.
 - **`gap-tap { message_id, segment_index }`**: recognition gap, once per word per message.
 - **`ask { session_id, question }`**: tutor answer outside the roleplay, examples with Jyutping, `say_it` creates a gap.
-- **`tts { text, voice, rate }`**: sha256 cache in Storage, signed URL (24 h).
+- **`tts`**: `GET ?text=&voice=&rate=` returns the MP3 (cached phrases redirect to Storage). `POST` returns a signed URL (used by the bench for WAV). Cache shared with `chat` via `_shared/tts-cache.ts`.
 - **`stt`** (raw WAV body): Azure short-audio recognition, `zh-HK`.
 - **`scenario-generate { description, base_spec?, edit?, harder? }`**: Rehearse spec preview (nothing saved).
 - **`delete-account`**: deletes the auth user; cascades remove everything.
@@ -118,6 +118,15 @@ Daily limits (F12): free 25 messages and 10 tutor questions; pro 300 and 100. To
 In Expo Go (development builds only), each message shows a small ⏱ line: how long the reply took, how long until its voice started playing, and how long your recording took to turn into text.
 
 Every Edge Function on the voice path (`session-start`, `chat`, `tts`, `stt`) returns a `timings` object with per-step milliseconds.
+
+How a spoken turn stays fast (6.5 s → 2.8 s median, see `perf/`):
+- **Region:** functions that touch the database run next to it (`x-region: us-west-2`, `FunctionRegion.UsWest2`). `stt` runs nearest to the phone.
+- **Streaming reply:** `chat` streams NDJSON. The reply tool's first field is `say`, so the text is sent (`say` event) the moment it exists, before glosses and gaps. With `speak: true`, the reply's voice follows inline as base64 MP3 chunks (`audio`, `audio_end`). The app writes them to a file (`expo-file-system`) and plays it locally, because the iPhone player is slow to start remote streams.
+- **Writes after the response:** gap upserts, events and schedules run in `EdgeRuntime.waitUntil`. Only the two messages and the turn count are saved before `done`.
+- **Hands-free:** a spoken turn sends itself (Settings → "Send automatically after speaking") and its reply always plays.
+- **Opener:** `session-start` makes the opener's voice while the rest of the reply is written and returns it in the response.
+- **Phone cache:** every clip is kept in the phone's cache folder, so replays are instant.
+- The Azure Speech resource is in `eastus` while everything else runs in Oregon. Moving it to `westus2` would save roughly another 0.1–0.2 s per reply.
 
 ## Known gaps and risks
 - Azure speech recognition writes numbers as digits (一杯 -> 1杯), so a spoken number won't string-match a target gap written in characters.

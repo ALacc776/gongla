@@ -4,7 +4,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { endSession, startSession } from '@/lib/api';
-import { useSpeaker } from '@/lib/audio';
+import { useSpeaker, useVoiceSettings } from '@/lib/audio';
 import { useAuth } from '@/lib/auth';
 import { PROFILE_KEY, updateProfile } from '@/lib/profile';
 import { colors } from '@/lib/theme';
@@ -21,6 +21,7 @@ export default function SummaryScreen() {
   const queryClient = useQueryClient();
   const { userId } = useAuth();
   const speak = useSpeaker();
+  const { rate } = useVoiceSettings();
 
   const summary = useQuery({
     queryKey: ['summary', sessionId],
@@ -35,7 +36,7 @@ export default function SummaryScreen() {
   });
 
   const again = useMutation({
-    mutationFn: () => startSession(summary.data!.scenario_id),
+    mutationFn: () => startSession(summary.data!.scenario_id, rate),
     onSuccess: ({ session_id }) => {
       queryClient.invalidateQueries({ queryKey: ['sessions'] });
       router.replace({ pathname: '/chat', params: { sessionId: session_id } });

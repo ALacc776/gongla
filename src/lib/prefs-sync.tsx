@@ -24,6 +24,7 @@ export function PrefsSync() {
       jyutping: p.jyutping ?? true,
       english: p.english ?? profile.level < 3,
       autoplay: p.autoplay ?? false,
+      autoSend: p.auto_send ?? true,
     });
   }, [profile]);
 
@@ -42,7 +43,8 @@ export function PrefsSync() {
         state.hanzi === prev.hanzi &&
         state.jyutping === prev.jyutping &&
         state.english === prev.english &&
-        state.autoplay === prev.autoplay
+        state.autoplay === prev.autoplay &&
+        state.autoSend === prev.autoSend
       ) {
         return;
       }
@@ -56,6 +58,7 @@ export function PrefsSync() {
             jyutping: state.jyutping,
             english: state.english,
             autoplay: state.autoplay,
+            auto_send: state.autoSend,
           },
         }).catch(() => {});
       }, 800);

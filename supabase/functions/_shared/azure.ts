@@ -21,7 +21,14 @@ const OUTPUT_FORMATS: Record<AudioFormat, string> = {
   wav: 'riff-16khz-16bit-mono-pcm',
 };
 
-export async function synthesize(text: string, voice: string, rate: number, format: AudioFormat): Promise<Uint8Array> {
+// Azure starts sending audio while it is still synthesizing, so the body can be
+// streamed straight on to the app.
+export async function synthesizeStream(
+  text: string,
+  voice: string,
+  rate: number,
+  format: AudioFormat,
+): Promise<ReadableStream<Uint8Array>> {
   const { key, region } = config();
   const ssml = `<speak version="1.0" xml:lang="zh-HK"><voice name="${voice}"><prosody rate="${rate}">${escapeXml(text)}</prosody></voice></speak>`;
   const res = await fetch(`https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`, {
@@ -34,11 +41,15 @@ export async function synthesize(text: string, voice: string, rate: number, form
     },
     body: ssml,
   });
-  if (!res.ok) {
+  if (!res.ok || !res.body) {
     console.error('Azure TTS error', res.status, await res.text());
     throw new Error('The voice service failed. Try again.');
   }
-  return new Uint8Array(await res.arrayBuffer());
+  return res.body;
+}
+
+export async function synthesize(text: string, voice: string, rate: number, format: AudioFormat): Promise<Uint8Array> {
+  return new Uint8Array(await new Response(await synthesizeStream(text, voice, rate, format)).arrayBuffer());
 }
 
 // Short-audio recognition: up to 60 s of 16 kHz mono WAV.

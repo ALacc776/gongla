@@ -19,13 +19,10 @@ export async function callTool<T>(opts: CallOptions): Promise<T> {
   return (await callToolWithStats<T>(opts)).input;
 }
 
-// Same as callTool, plus how long the call took and how many tokens it used.
-export async function callToolWithStats<T>(opts: CallOptions): Promise<{ input: T; stats: CallStats }> {
-  const started = performance.now();
+function request(opts: CallOptions, stream: boolean) {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set');
-
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  return fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -40,8 +37,67 @@ export async function callToolWithStats<T>(opts: CallOptions): Promise<{ input: 
       messages: opts.messages,
       tools: [opts.tool],
       tool_choice: { type: 'tool', name: opts.tool.name },
+      stream,
     }),
   });
+}
+
+// Like callToolWithStats, but streams: onJson gets the tool input JSON so far
+// every time more of it arrives, so callers can act on early fields.
+export async function streamToolWithStats<T>(
+  opts: CallOptions,
+  onJson: (partial: string) => void,
+): Promise<{ input: T; stats: CallStats }> {
+  const started = performance.now();
+  const res = await request(opts, true);
+  if (!res.ok || !res.body) {
+    console.error('Anthropic error', res.status, await res.text());
+    throw new Error('The AI service failed. Try again.');
+  }
+
+  const stats: CallStats = { ms: 0, input_tokens: 0, output_tokens: 0, cache_read_tokens: 0 };
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  let pending = '';
+  let json = '';
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    pending += value;
+    // Server-sent events are separated by a blank line; each has a `data:` JSON line.
+    let split;
+    while ((split = pending.indexOf('\n\n')) >= 0) {
+      const event = pending.slice(0, split);
+      pending = pending.slice(split + 2);
+      const dataLine = event.split('\n').find((line) => line.startsWith('data:'));
+      if (!dataLine) continue;
+      const data = JSON.parse(dataLine.slice(5));
+      if (data.type === 'message_start') {
+        stats.input_tokens = data.message?.usage?.input_tokens ?? 0;
+        stats.cache_read_tokens = data.message?.usage?.cache_read_input_tokens ?? 0;
+      } else if (data.type === 'content_block_delta' && data.delta?.type === 'input_json_delta') {
+        json += data.delta.partial_json;
+        onJson(json);
+      } else if (data.type === 'message_delta') {
+        stats.output_tokens = data.usage?.output_tokens ?? stats.output_tokens;
+      } else if (data.type === 'error') {
+        console.error('Anthropic stream error', data.error);
+        throw new Error('The AI service failed. Try again.');
+      }
+    }
+  }
+
+  stats.ms = Math.round(performance.now() - started);
+  try {
+    return { input: JSON.parse(json) as T, stats };
+  } catch {
+    throw new Error('The AI returned an unexpected reply. Try again.');
+  }
+}
+
+// Same as callTool, plus how long the call took and how many tokens it used.
+export async function callToolWithStats<T>(opts: CallOptions): Promise<{ input: T; stats: CallStats }> {
+  const started = performance.now();
+  const res = await request(opts, false);
 
   if (!res.ok) {
     console.error('Anthropic error', res.status, await res.text());
