@@ -312,20 +312,21 @@ export default function ChatScreen() {
               multiline
               editable={!limited && !turnCapped}
             />
-            {draft.trim() ? (
+            {!!draft.trim() && (
               <Pressable
                 style={[styles.sendButton, send.isPending && styles.sendDisabled]}
                 disabled={send.isPending}
                 onPress={() => submit()}>
                 <Text style={styles.sendText}>Send</Text>
               </Pressable>
-            ) : (
-              <MicButton
-                disabled={send.isPending || limited || turnCapped}
-                onTranscript={onTranscript}
-                onListeningChange={setListening}
-              />
             )}
+            {/* Always mounted so the mic stays ready; hidden while there's typed text. */}
+            <MicButton
+              hidden={!!draft.trim()}
+              disabled={send.isPending || limited || turnCapped}
+              onTranscript={onTranscript}
+              onListeningChange={setListening}
+            />
           </View>
         )}
       </KeyboardAvoidingView>

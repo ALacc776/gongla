@@ -12,8 +12,18 @@ import { useProfile } from '@/lib/profile';
 const SLOW_RATE = 0.7;
 
 let player: AudioPlayer | null = null;
+// While a chat is open (and the mic is allowed) the phone stays ready to record, so
+// pressing the mic starts instantly. Replies still play through the loudspeaker.
+let recordReady = false;
 
+export async function setRecordReady(ready: boolean) {
+  recordReady = ready;
+  await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: ready });
+}
+
+// Playback-only mode, unless a chat is keeping the mic ready.
 export async function setPlaybackMode() {
+  if (recordReady) return;
   await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false });
 }
 
@@ -22,7 +32,9 @@ export async function setPlaybackMode() {
 export async function warmUpAudio() {
   if (player) return;
   await setPlaybackMode();
-  player = createAudioPlayer(null);
+  // Without this, expo-audio switches the phone's audio off 0.1 s after a clip
+  // ends or is paused, which kills a recording that's starting or under way.
+  player = createAudioPlayer(null, { keepAudioSessionActive: true });
 }
 
 // Plays a file on the phone and resolves once audio is actually playing (or after 10 s).
@@ -51,6 +63,8 @@ async function playFile(file: File) {
 export function stopPlayback() {
   player?.pause();
 }
+
+
 
 export type VoiceSettings = { voice: string; rate: number };
 
