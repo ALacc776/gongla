@@ -4,6 +4,7 @@ import { addGapEvents, markGapUsed, upsertGap, type GapEventKind } from '../_sha
 import { segmentJyutping } from '../_shared/jyutping.ts';
 import { cantonize, checkMandarin } from '../_shared/mandarin.ts';
 import { generateReply, replyText, type ChatTurn, type ScenarioSpec, type TargetGap } from '../_shared/reply.ts';
+import { AiError } from '../_shared/anthropic.ts';
 import { analyzeInput, hasHan, normalizeEnglish, normalizeHanzi } from '../_shared/text.ts';
 import { startTimer } from '../_shared/timing.ts';
 import { concatBytes, saveTts, toBase64, ttsHash, ttsParams, TTS_BUCKET } from '../_shared/tts-cache.ts';
@@ -181,9 +182,20 @@ export default {
             cancel.signal,
           );
         } catch (e) {
+          const failure = {
+            session_id,
+            turn: session.turn_count + 1,
+            level: profile?.level ?? 1,
+            history_len: history.length,
+            said_already: sayAt !== null,
+            code: e instanceof AiError ? e.code : 'unknown',
+            message: (e as Error).message,
+          };
+          if (cancel.signal.aborted) console.warn('chat turn cancelled', failure);
+          else console.error('chat_reply_failed', failure);
           await refund();
           await audioTask;
-          send({ type: 'error', error: (e as Error).message });
+          send({ type: 'error', error: (e as Error).message, code: failure.code });
           close();
           return;
         }
@@ -284,9 +296,9 @@ export default {
         ]);
         timer.mark('save');
         if (saveError || !saved) {
-          console.error('message save failed', saveError);
+          console.error('message save failed', { session_id, turn: session.turn_count + 1, error: saveError });
           await audioTask;
-          send({ type: 'error', error: 'Could not save the message' });
+          send({ type: 'error', error: 'Could not save the message', code: 'save_failed' });
           close();
           return;
         }

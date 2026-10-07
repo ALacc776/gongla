@@ -126,7 +126,7 @@ export async function sendChat(
       else if (event.type === 'audio_end') handlers.onAudioEnd?.();
       else if (event.type === 'audio_error') handlers.onAudioError?.();
       else if (event.type === 'done') result = event;
-      else if (event.type === 'error') throw new ApiError(event.error, null, null);
+      else if (event.type === 'error') throw new ApiError(event.error, null, event.code ?? null);
     }
   }
   if (!result) throw new ApiError('The chat stopped early. Try again.', null, null);

@@ -22,7 +22,7 @@ import { MessageBubble, TypingBubble } from '@/components/message-bubble';
 import { MicButton } from '@/components/mic-button';
 import { Button, Icon, Toggle } from '@/components/ui';
 import { ApiError, sendChat, tapGap } from '@/lib/api';
-import { receiveClip, useSpeaker, useVoiceSettings, warmUpAudio } from '@/lib/audio';
+import { receiveClip, stopPlayback, useSpeaker, useVoiceSettings, warmUpAudio } from '@/lib/audio';
 import { routeInput } from '@/lib/btw';
 import { useDisplayStore } from '@/lib/display-store';
 import { formatSeconds, SHOW_TIMINGS, usePerfStore } from '@/lib/perf-store';
@@ -130,6 +130,8 @@ export default function ChatScreen() {
       const wantVoice = spoken || display.autoplay;
       let clip: ReturnType<typeof receiveClip> | null = null;
       let sayText = '';
+      // The reply's voice once it starts, so a turn that fails can silence it.
+      const voice: { playing: Promise<unknown> | null; failed: boolean } = { playing: null, failed: false };
       try {
         return await sendChat(
           sessionId,
@@ -146,16 +148,22 @@ export default function ChatScreen() {
             },
             onAudio: (b64) => clip?.append(b64),
             onAudioEnd: () => {
-              clip?.play().then((ok) => {
-                if (!ok) speak(sayText);
-              });
+              voice.playing = clip?.play().then((ok) => (ok || voice.failed ? undefined : speak(sayText))) ?? null;
             },
-            onAudioError: () => speak(sayText),
+            onAudioError: () => {
+              voice.playing = speak(sayText);
+            },
           },
           wantVoice ? voiceSettings : undefined,
           current.controller.signal,
         );
       } catch (e) {
+        // The reply is gone from the screen, so its voice stops too, even one still starting.
+        voice.failed = true;
+        if (voice.playing) {
+          stopPlayback();
+          voice.playing.then(stopPlayback, stopPlayback);
+        }
         if (current.controller.signal.aborted) throw new TurnCancelled(current.reason);
         throw e;
       } finally {
@@ -180,6 +188,13 @@ export default function ChatScreen() {
       if (turn_count >= turn_cap) setTurnCapped(true);
     },
     onError: (error, { text, spoken }) => {
+      if (__DEV__) {
+        console.warn('chat failed', {
+          reason: error instanceof ApiError || error instanceof TurnCancelled ? error.reason : null,
+          message: error.message,
+          sessionId,
+        });
+      }
       if (error instanceof TurnCancelled) {
         // The server saves nothing once a turn is cancelled, but if it finished just
         // before, this brings the saved turn in.

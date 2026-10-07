@@ -1,8 +1,16 @@
-import { callToolWithStats, streamToolWithStats, type CallStats, type ChatTurn, type SystemBlock } from './anthropic.ts';
+import {
+  aiFailure,
+  callToolWithStats,
+  streamToolWithStats,
+  type CallStats,
+  type ChatTurn,
+  type SystemBlock,
+} from './anthropic.ts';
 import { segmentJyutping } from './jyutping.ts';
 import { checkMandarin, MANDARIN_THRESHOLD } from './mandarin.ts';
 import { extractClosedString } from './stream-json.ts';
 import { hasQuestion } from './text.ts';
+import { asArray } from './tool-input.ts';
 
 export type { ChatTurn } from './anthropic.ts';
 
@@ -278,6 +286,10 @@ function dynamicPrompt(ctx: ReplyContext): string {
 
 const SCENE_START = '(The scene begins. Speak first.)';
 
+// Room for a long reply plus its per-word glosses, gaps and corrections. A cut-off
+// reply fails the whole turn, and unused tokens cost nothing.
+const REPLY_MAX_TOKENS = 1500;
+
 // Anthropic needs the conversation to start with a user turn, but the character
 // speaks first, so a placeholder user turn stands in for the start of the scene.
 function withLeadingUserTurn(turns: ChatTurn[]): ChatTurn[] {
@@ -303,16 +315,36 @@ async function callReply(
     system,
     messages: withLeadingUserTurn(history),
     tool: replyTool(Boolean(ctx.candidates)),
+    maxTokens: REPLY_MAX_TOKENS,
     signal,
   };
   const { input, stats } = onPartial
     ? await streamToolWithStats<ReplyInput>(options, onPartial)
     : await callToolWithStats<ReplyInput>(options);
   calls.push(stats);
-  if (!Array.isArray(input.segments) || input.segments.length === 0) {
-    throw new Error('The AI returned an unexpected reply. Try again.');
+  return cleanInput(input, stats);
+}
+
+// Lists can arrive as JSON strings; a reply without usable segments falls back to
+// `say` as one chunk (no per-word glosses) rather than failing the turn.
+function cleanInput(input: ReplyInput, stats: CallStats): ReplyInput {
+  const raw = input as unknown as Record<string, unknown>;
+  const say = typeof raw.say === 'string' ? raw.say.trim() : '';
+  let segments = (asArray<Segment>(raw.segments) ?? []).filter((s) => typeof s?.hanzi === 'string' && s.hanzi);
+  if (!segments.length) {
+    const info = { tool: 'reply', keys: Object.keys(raw), segments: String(raw.segments).slice(0, 300), ...stats };
+    if (!say) throw aiFailure('bad_shape', info);
+    console.warn('reply had no usable segments, using say as one', info);
+    segments = [{ hanzi: say, gloss: '' }];
   }
-  return input;
+  return {
+    ...input,
+    segments,
+    gaps: asArray<ModelGap>(raw.gaps) ?? [],
+    corrections: asArray<Correction>(raw.corrections) ?? [],
+    targets_used: asArray<string>(raw.targets_used) ?? [],
+    target_gap_ids: asArray<string>(raw.target_gap_ids) ?? [],
+  };
 }
 
 function sayOf(input: ReplyInput): string {
@@ -412,10 +444,10 @@ export async function generateReply(
     say: sayOf(input),
     sayEmitted,
     payload,
-    gaps: Array.isArray(input.gaps) ? input.gaps : [],
-    corrections: Array.isArray(input.corrections) ? input.corrections.slice(0, 2) : [],
-    targetsUsed: Array.isArray(input.targets_used) ? input.targets_used : [],
-    chosenTargetIds: Array.isArray(input.target_gap_ids) ? input.target_gap_ids : [],
+    gaps: input.gaps ?? [],
+    corrections: (input.corrections ?? []).slice(0, 2),
+    targetsUsed: input.targets_used ?? [],
+    chosenTargetIds: input.target_gap_ids ?? [],
   };
 }
 

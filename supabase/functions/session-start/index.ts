@@ -1,5 +1,6 @@
 import { withSupabase } from 'npm:@supabase/server@1';
 
+import { AiError } from '../_shared/anthropic.ts';
 import { generateReply, replyText, type ScenarioSpec, type TargetGap } from '../_shared/reply.ts';
 import { validSpec } from '../_shared/spec.ts';
 import { startTimer } from '../_shared/timing.ts';
@@ -88,7 +89,9 @@ export default {
         startAudio,
       );
     } catch (e) {
-      return Response.json({ error: (e as Error).message }, { status: 502 });
+      const code = e instanceof AiError ? e.code : 'unknown';
+      console.error('opener_failed', { scenario_id: scenario.id, code, message: (e as Error).message });
+      return Response.json({ error: (e as Error).message, reason: code }, { status: 502 });
     }
     if (!result.sayEmitted) startAudio(result.say);
 
