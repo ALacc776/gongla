@@ -111,6 +111,14 @@ All use `withSupabase({ auth: 'user' })`. Reads go through the caller's RLS (`ct
 
 Daily limits (F12): free 25 messages and 10 tutor questions; pro 300 and 100. To make yourself pro for testing, run in the SQL editor: `update profiles set plan = 'pro' where id = '<your user id from Settings>';`
 
+## Performance
+
+`node scripts/bench.mjs` (or `--turns 8`) replays a spoken cha chaan teng conversation against the deployed backend: speech to text, reply, reply to speech, audio download. It prints the median time per step, compares with the previous run, and saves the result in `perf/`. Uses a throwaway anonymous user (deleted afterwards), about $0.03 a run.
+
+In Expo Go (development builds only), each message shows a small ⏱ line: how long the reply took, how long until its voice started playing, and how long your recording took to turn into text.
+
+Every Edge Function on the voice path (`session-start`, `chat`, `tts`, `stt`) returns a `timings` object with per-step milliseconds.
+
 ## Known gaps and risks
 - Azure speech recognition writes numbers as digits (一杯 -> 1杯), so a spoken number won't string-match a target gap written in characters.
 - Level-1 replies are very short by design ("under 10 characters"); they can feel abrupt.

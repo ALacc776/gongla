@@ -10,13 +10,24 @@ type Props = {
   // Tap-to-gloss: called when a word is tapped (records a recognition gap).
   onTapSegment?: (messageId: string, index: number, hanzi: string) => void;
   onPlay?: (text: string) => void;
+  // Development builds only: e.g. "⏱ reply 3.8s · voice 1.7s".
+  timing?: string;
 };
 
-export function MessageBubble({ message, onTapSegment, onPlay }: Props) {
-  if (message.role === 'user' || !isReply(message.payload)) {
-    return <UserBubble text={message.text_raw} payload={message.payload as UserPayload | null} onPlay={onPlay} />;
-  }
-  return <AssistantBubble message={message} onTapSegment={onTapSegment} onPlay={onPlay} />;
+export function MessageBubble({ message, onTapSegment, onPlay, timing }: Props) {
+  const bubble =
+    message.role === 'user' || !isReply(message.payload) ? (
+      <UserBubble text={message.text_raw} payload={message.payload as UserPayload | null} onPlay={onPlay} />
+    ) : (
+      <AssistantBubble message={message} onTapSegment={onTapSegment} onPlay={onPlay} />
+    );
+  if (!timing) return bubble;
+  return (
+    <View>
+      {bubble}
+      <Text style={[styles.timing, message.role === 'user' && styles.timingRight]}>{timing}</Text>
+    </View>
+  );
 }
 
 function AssistantBubble({ message, onTapSegment, onPlay }: Props) {
@@ -161,6 +172,8 @@ const styles = StyleSheet.create({
   english: { fontSize: 15, color: colors.muted },
   speaker: { fontSize: 18 },
   typing: { fontSize: 22, color: colors.muted },
+  timing: { fontSize: 11, color: colors.muted, marginTop: 3, marginHorizontal: 4 },
+  timingRight: { textAlign: 'right' },
   chip: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,

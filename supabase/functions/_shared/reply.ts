@@ -1,4 +1,4 @@
-import { callTool, type ChatTurn, type SystemBlock } from './anthropic.ts';
+import { callToolWithStats, type CallStats, type ChatTurn, type SystemBlock } from './anthropic.ts';
 import { segmentJyutping } from './jyutping.ts';
 import { checkMandarin, MANDARIN_THRESHOLD } from './mandarin.ts';
 
@@ -34,6 +34,8 @@ export type ReplyPayload = {
 };
 
 export type ReplyResult = {
+  // One entry per model call (2 if the Mandarin check forced a retry).
+  calls: CallStats[];
   payload: ReplyPayload;
   gaps: ModelGap[];
   corrections: Correction[];
@@ -230,17 +232,18 @@ function withLeadingUserTurn(turns: ChatTurn[]): ChatTurn[] {
     : turns;
 }
 
-async function callReply(ctx: ReplyContext, history: ChatTurn[], extraSystem?: string) {
+async function callReply(ctx: ReplyContext, history: ChatTurn[], calls: CallStats[], extraSystem?: string) {
   const system: SystemBlock[] = [
     { type: 'text', text: STATIC_PROMPT, cache_control: { type: 'ephemeral' } },
     { type: 'text', text: dynamicPrompt(ctx) },
   ];
   if (extraSystem) system.push({ type: 'text', text: extraSystem });
-  const input = await callTool<ReplyInput>({
+  const { input, stats } = await callToolWithStats<ReplyInput>({
     system,
     messages: withLeadingUserTurn(history),
     tool: replyTool(Boolean(ctx.candidates)),
   });
+  calls.push(stats);
   if (!Array.isArray(input.segments) || input.segments.length === 0) {
     throw new Error('The AI returned an unexpected reply. Try again.');
   }
@@ -248,7 +251,8 @@ async function callReply(ctx: ReplyContext, history: ChatTurn[], extraSystem?: s
 }
 
 export async function generateReply(ctx: ReplyContext, history: ChatTurn[]): Promise<ReplyResult> {
-  let input = await callReply(ctx, history);
+  const calls: CallStats[] = [];
+  let input = await callReply(ctx, history, calls);
   let check = checkMandarin(input.segments.map((s) => s.hanzi).join(''));
 
   // F4: regenerate once if the reply drifted into Mandarin.
@@ -258,6 +262,7 @@ export async function generateReply(ctx: ReplyContext, history: ChatTurn[]): Pro
       const retry = await callReply(
         ctx,
         history,
+        calls,
         `IMPORTANT: your previous draft of this reply used Mandarin forms: ${check.hits.join(', ') || 'no Cantonese words at all'}. Write it in colloquial spoken Hong Kong Cantonese instead.`,
       );
       const retryCheck = checkMandarin(retry.segments.map((s) => s.hanzi).join(''));
@@ -285,6 +290,7 @@ export async function generateReply(ctx: ReplyContext, history: ChatTurn[]): Pro
   }
 
   return {
+    calls,
     payload,
     gaps: Array.isArray(input.gaps) ? input.gaps : [],
     corrections: Array.isArray(input.corrections) ? input.corrections.slice(0, 2) : [],

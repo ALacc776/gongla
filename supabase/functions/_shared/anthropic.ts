@@ -5,13 +5,23 @@ export type SystemBlock = { type: 'text'; text: string; cache_control?: { type: 
 export type ChatTurn = { role: 'user' | 'assistant'; content: string };
 export type Tool = { name: string; description: string; input_schema: Record<string, unknown> };
 
-export async function callTool<T>(opts: {
+export type CallStats = { ms: number; input_tokens: number; output_tokens: number; cache_read_tokens: number };
+
+type CallOptions = {
   system: SystemBlock[];
   messages: ChatTurn[];
   tool: Tool;
   maxTokens?: number;
   temperature?: number;
-}): Promise<T> {
+};
+
+export async function callTool<T>(opts: CallOptions): Promise<T> {
+  return (await callToolWithStats<T>(opts)).input;
+}
+
+// Same as callTool, plus how long the call took and how many tokens it used.
+export async function callToolWithStats<T>(opts: CallOptions): Promise<{ input: T; stats: CallStats }> {
+  const started = performance.now();
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set');
 
@@ -41,5 +51,13 @@ export async function callTool<T>(opts: {
   const data = await res.json();
   const toolUse = data.content?.find((block: { type: string }) => block.type === 'tool_use');
   if (!toolUse?.input) throw new Error('The AI returned an unexpected reply. Try again.');
-  return toolUse.input as T;
+  return {
+    input: toolUse.input as T,
+    stats: {
+      ms: Math.round(performance.now() - started),
+      input_tokens: data.usage?.input_tokens ?? 0,
+      output_tokens: data.usage?.output_tokens ?? 0,
+      cache_read_tokens: data.usage?.cache_read_input_tokens ?? 0,
+    },
+  };
 }

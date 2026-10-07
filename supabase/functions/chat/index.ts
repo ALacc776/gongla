@@ -5,6 +5,7 @@ import { segmentJyutping } from '../_shared/jyutping.ts';
 import { generateReply, replyText, type ChatTurn, type ScenarioSpec, type TargetGap } from '../_shared/reply.ts';
 import { cantonize, checkMandarin } from '../_shared/mandarin.ts';
 import { analyzeInput } from '../_shared/text.ts';
+import { startTimer } from '../_shared/timing.ts';
 import { limitResponse, refundUsage, takeUsage } from '../_shared/usage.ts';
 
 const HISTORY_LIMIT = 16;
@@ -22,6 +23,7 @@ type RecentMessage = { id: string; role: 'user' | 'assistant'; text_raw: string 
 
 export default {
   fetch: withSupabase({ auth: 'user' }, async (req, ctx) => {
+    const timer = startTimer();
     const userId = ctx.userClaims?.id;
     if (!userId) return Response.json({ error: 'Not signed in' }, { status: 401 });
 
@@ -62,6 +64,7 @@ export default {
         ctx.supabase.from('gap_events').select('gap_id').eq('session_id', session_id).eq('kind', 'used'),
       ]);
 
+    timer.mark('db_load');
     const recent = ((recentDesc ?? []) as RecentMessage[]).reverse();
     const usedThisSession = new Set((usedEvents ?? []).map((e: { gap_id: string }) => e.gap_id));
     // Targets already used this session drop out of the prompt so the scene moves on.
@@ -73,6 +76,7 @@ export default {
 
     // F12: count the message against today's limit before paying for the model call.
     if (!(await takeUsage(ctx.supabaseAdmin, userId, 'messages'))) return limitResponse();
+    timer.mark('usage');
 
     const spec = (session.scenarios as unknown as { spec: ScenarioSpec }).spec;
     let result;
@@ -93,6 +97,7 @@ export default {
       return Response.json({ error: (e as Error).message }, { status: 502 });
     }
 
+    timer.mark('model');
     const now = new Date();
     const userMessageId = crypto.randomUUID();
     const assistantMessageId = crypto.randomUUID();
@@ -178,6 +183,7 @@ export default {
       }
     }
 
+    timer.mark('gaps');
     // Explicit timestamps keep the order stable: one insert shares a single now().
     const { data: saved, error: saveError } = await ctx.supabaseAdmin
       .from('messages')
@@ -214,11 +220,14 @@ export default {
         .eq('id', session_id),
     ]);
 
+    timer.mark('save');
+
     return Response.json({
       user_message: saved[0],
       message: saved[1],
       turn_count: session.turn_count + 1,
       turn_cap: TURN_CAP,
+      timings: { ...timer.done(), model_calls: result.calls.length, output_tokens: result.calls.reduce((n, c) => n + c.output_tokens, 0) },
     });
   }),
 };

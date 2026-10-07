@@ -1,0 +1,247 @@
+{
+  "date": "2026-10-07T00:08:50.526Z",
+  "turns": 6,
+  "summary": {
+    "turn_total": {
+      "median": 6475,
+      "worst": 7167
+    },
+    "stt": 772,
+    "chat": 3780,
+    "tts": 1645,
+    "download": 508,
+    "chat_server": {
+      "db_load": 445,
+      "usage": 549,
+      "model": 1743,
+      "gaps": 270,
+      "save": 350,
+      "total": 3388,
+      "output_tokens": 169
+    },
+    "stt_server": {
+      "azure": 530,
+      "total": 531
+    },
+    "tts_server": {
+      "azure": 371,
+      "upload": 536,
+      "total": 1426
+    },
+    "opener": {
+      "session_start": 3008,
+      "tts": 624,
+      "download": 513,
+      "total": 4145
+    },
+    "mandarin_retries": 0
+  },
+  "detail": [
+    {
+      "heard": "兩位唔該。",
+      "reply": "跟我嚟",
+      "stt_ms": 801,
+      "chat_ms": 3883,
+      "tts_ms": 1945,
+      "tts_cached": false,
+      "download_ms": 469,
+      "total_ms": 7098,
+      "server": {
+        "stt": {
+          "upload": 1,
+          "azure": 571,
+          "total": 572,
+          "audio_bytes": 77244
+        },
+        "chat": {
+          "db_load": 403,
+          "usage": 583,
+          "model": 1774,
+          "gaps": 339,
+          "save": 400,
+          "total": 3499,
+          "model_calls": 1,
+          "output_tokens": 176
+        },
+        "tts": {
+          "cache_lookup": 335,
+          "azure": 370,
+          "upload": 912,
+          "sign": 105,
+          "total": 1723
+        }
+      }
+    },
+    {
+      "heard": "我想要一個菠蘿包。",
+      "reply": "得，飲咩",
+      "stt_ms": 857,
+      "chat_ms": 4010,
+      "tts_ms": 1784,
+      "tts_cached": false,
+      "download_ms": 516,
+      "total_ms": 7167,
+      "server": {
+        "stt": {
+          "upload": 1,
+          "azure": 622,
+          "total": 623,
+          "audio_bytes": 83644
+        },
+        "chat": {
+          "db_load": 477,
+          "usage": 514,
+          "model": 2122,
+          "gaps": 281,
+          "save": 275,
+          "total": 3669,
+          "model_calls": 1,
+          "output_tokens": 198
+        },
+        "tts": {
+          "cache_lookup": 329,
+          "azure": 573,
+          "upload": 494,
+          "sign": 141,
+          "total": 1538
+        }
+      }
+    },
+    {
+      "heard": "凍檸茶少甜。",
+      "reply": "得啦",
+      "stt_ms": 846,
+      "chat_ms": 3677,
+      "tts_ms": 830,
+      "tts_cached": true,
+      "download_ms": 525,
+      "total_ms": 5878,
+      "server": {
+        "stt": {
+          "upload": 1,
+          "azure": 568,
+          "total": 569,
+          "audio_bytes": 78844
+        },
+        "chat": {
+          "db_load": 420,
+          "usage": 449,
+          "model": 1613,
+          "gaps": 258,
+          "save": 535,
+          "total": 3276,
+          "model_calls": 1,
+          "output_tokens": 157
+        },
+        "tts": {
+          "cache_lookup": 320,
+          "sign": 289,
+          "total": 609
+        }
+      }
+    },
+    {
+      "heard": "幾多錢呀？",
+      "reply": "等陣啦",
+      "stt_ms": 743,
+      "chat_ms": 3952,
+      "tts_ms": 1721,
+      "tts_cached": false,
+      "download_ms": 523,
+      "total_ms": 6939,
+      "server": {
+        "stt": {
+          "upload": 1,
+          "azure": 446,
+          "total": 447,
+          "audio_bytes": 58444
+        },
+        "chat": {
+          "db_load": 594,
+          "usage": 614,
+          "model": 1768,
+          "gaps": 321,
+          "save": 251,
+          "total": 3549,
+          "model_calls": 1,
+          "output_tokens": 176
+        },
+        "tts": {
+          "cache_lookup": 304,
+          "azure": 369,
+          "upload": 577,
+          "sign": 274,
+          "total": 1524
+        }
+      }
+    },
+    {
+      "heard": "唔該埋單？",
+      "reply": "得。",
+      "stt_ms": 710,
+      "chat_ms": 3578,
+      "tts_ms": 553,
+      "tts_cached": true,
+      "download_ms": 499,
+      "total_ms": 5340,
+      "server": {
+        "stt": {
+          "upload": 1,
+          "azure": 492,
+          "total": 493,
+          "audio_bytes": 62044
+        },
+        "chat": {
+          "db_load": 429,
+          "usage": 599,
+          "model": 1596,
+          "gaps": 134,
+          "save": 434,
+          "total": 3192,
+          "model_calls": 1,
+          "output_tokens": 155
+        },
+        "tts": {
+          "cache_lookup": 170,
+          "sign": 163,
+          "total": 333
+        }
+      }
+    },
+    {
+      "heard": "有冇奶茶？",
+      "reply": "有啦",
+      "stt_ms": 698,
+      "chat_ms": 3504,
+      "tts_ms": 1569,
+      "tts_cached": false,
+      "download_ms": 240,
+      "total_ms": 6011,
+      "server": {
+        "stt": {
+          "upload": 1,
+          "azure": 466,
+          "total": 467,
+          "audio_bytes": 60044
+        },
+        "chat": {
+          "db_load": 461,
+          "usage": 440,
+          "model": 1717,
+          "gaps": 246,
+          "save": 299,
+          "total": 3163,
+          "model_calls": 1,
+          "output_tokens": 162
+        },
+        "tts": {
+          "cache_lookup": 357,
+          "azure": 371,
+          "upload": 475,
+          "sign": 124,
+          "total": 1327
+        }
+      }
+    }
+  ]
+}

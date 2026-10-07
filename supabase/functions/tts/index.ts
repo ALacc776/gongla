@@ -1,6 +1,7 @@
 import { withSupabase } from 'npm:@supabase/server@1';
 
 import { DEFAULT_VOICE, synthesize, VOICES, type AudioFormat } from '../_shared/azure.ts';
+import { startTimer } from '../_shared/timing.ts';
 import { countUsage } from '../_shared/usage.ts';
 
 const BUCKET = 'tts';
@@ -15,6 +16,7 @@ async function sha256(text: string) {
 // F10: Cantonese speech, cached in Storage so each phrase is synthesized once for everyone.
 export default {
   fetch: withSupabase({ auth: 'user' }, async (req, ctx) => {
+    const timer = startTimer();
     const userId = ctx.userClaims?.id;
     if (!userId) return Response.json({ error: 'Not signed in' }, { status: 401 });
 
@@ -31,6 +33,7 @@ export default {
     const path = `${hash.slice(0, 2)}/${hash}.${format}`;
 
     const { data: cached } = await ctx.supabaseAdmin.from('tts_cache').select('storage_path').eq('hash', hash).maybeSingle();
+    timer.mark('cache_lookup');
     if (!cached) {
       let audio;
       try {
@@ -38,6 +41,7 @@ export default {
       } catch (e) {
         return Response.json({ error: (e as Error).message }, { status: 502 });
       }
+      timer.mark('azure');
       const { error: uploadError } = await ctx.supabaseAdmin.storage
         .from(BUCKET)
         .upload(path, audio, { contentType: format === 'wav' ? 'audio/wav' : 'audio/mpeg', upsert: true });
@@ -47,6 +51,7 @@ export default {
       }
       await ctx.supabaseAdmin.from('tts_cache').upsert({ hash, storage_path: path });
       await countUsage(ctx.supabaseAdmin, userId, 'tts_chars', text.length);
+      timer.mark('upload');
     }
 
     const { data: signed, error } = await ctx.supabaseAdmin.storage
@@ -54,6 +59,7 @@ export default {
       .createSignedUrl(cached?.storage_path ?? path, URL_TTL_SECONDS);
     if (error || !signed) return Response.json({ error: 'Could not load the audio' }, { status: 500 });
 
-    return Response.json({ url: signed.signedUrl, cached: !!cached });
+    timer.mark('sign');
+    return Response.json({ url: signed.signedUrl, cached: !!cached, timings: timer.done() });
   }),
 };

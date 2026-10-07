@@ -2,12 +2,14 @@ import { withSupabase } from 'npm:@supabase/server@1';
 
 import { generateReply, replyText, type ScenarioSpec, type TargetGap } from '../_shared/reply.ts';
 import { validSpec } from '../_shared/spec.ts';
+import { startTimer } from '../_shared/timing.ts';
 
 const CANDIDATE_LIMIT = 15;
 const TARGET_LIMIT = 5;
 
 export default {
   fetch: withSupabase({ auth: 'user' }, async (req, ctx) => {
+    const timer = startTimer();
     const userId = ctx.userClaims?.id;
     if (!userId) return Response.json({ error: 'Not signed in' }, { status: 401 });
 
@@ -51,6 +53,7 @@ export default {
         .limit(CANDIDATE_LIMIT),
     ]);
     const candidates = (due ?? []) as TargetGap[];
+    timer.mark('db_load');
 
     let result;
     try {
@@ -68,6 +71,7 @@ export default {
       return Response.json({ error: (e as Error).message }, { status: 502 });
     }
 
+    timer.mark('model');
     const candidateIds = new Set(candidates.map((c) => c.id));
     const targetIds = [...new Set(result.chosenTargetIds)]
       .filter((id) => candidateIds.has(id))
@@ -100,6 +104,13 @@ export default {
       .single();
     if (messageError) return Response.json({ error: 'Could not save the message' }, { status: 500 });
 
-    return Response.json({ session_id: session.id, scenario_id: scenario.id, message, target_count: targetIds.length });
+    timer.mark('save');
+    return Response.json({
+      session_id: session.id,
+      scenario_id: scenario.id,
+      message,
+      target_count: targetIds.length,
+      timings: { ...timer.done(), model_calls: result.calls.length, output_tokens: result.calls.reduce((n, c) => n + c.output_tokens, 0) },
+    });
   }),
 };

@@ -23,6 +23,7 @@ import { ApiError, sendChat, tapGap } from '@/lib/api';
 import { useSpeaker } from '@/lib/audio';
 import { routeInput } from '@/lib/btw';
 import { useDisplayStore } from '@/lib/display-store';
+import { formatSeconds, SHOW_TIMINGS, usePerfStore } from '@/lib/perf-store';
 import { supabase } from '@/lib/supabase';
 import { colors } from '@/lib/theme';
 import { isReply, SESSION_COLUMNS, type ChatMessage, type SessionRow } from '@/lib/types';
@@ -85,9 +86,20 @@ export default function ChatScreen() {
     }
   }, [messages.data, display.autoplay, readOnly, speak]);
 
+  const perf = usePerfStore();
+  // How long the last voice recording took to turn into text; attached to the next sent message.
+  const heardMs = useRef<number | null>(null);
+
   const send = useMutation({
-    mutationFn: (text: string) => sendChat(sessionId, text),
-    onSuccess: ({ user_message, message, turn_count, turn_cap }) => {
+    mutationFn: async (text: string) => {
+      const started = Date.now();
+      const result = await sendChat(sessionId, text);
+      return { ...result, ms: Date.now() - started };
+    },
+    onSuccess: ({ user_message, message, turn_count, turn_cap, ms }) => {
+      perf.record('reply', message.id, ms);
+      if (heardMs.current !== null) perf.record('heard', user_message.id, heardMs.current);
+      heardMs.current = null;
       queryClient.setQueryData<ChatMessage[]>(messagesKey, (old = []) => [...old, user_message, message]);
       queryClient.invalidateQueries({ queryKey: ['gaps'] });
       if (turn_count >= turn_cap) setTurnCapped(true);
@@ -122,6 +134,18 @@ export default function ChatScreen() {
       { text: 'Keep going', style: 'cancel' },
       { text: 'End', style: 'destructive', onPress: () => router.replace({ pathname: '/summary', params: { sessionId } }) },
     ]);
+  }
+
+  function timingLine(item: { id: string; role: string; text_raw: string }) {
+    const parts =
+      item.role === 'assistant'
+        ? [
+            formatSeconds(perf.reply[item.id]) && `reply ${formatSeconds(perf.reply[item.id])}`,
+            formatSeconds(perf.voice[item.text_raw]) && `voice ${formatSeconds(perf.voice[item.text_raw])}`,
+          ]
+        : [formatSeconds(perf.heard[item.id]) && `heard in ${formatSeconds(perf.heard[item.id])}`];
+    const line = parts.filter(Boolean).join(' · ');
+    return line ? `⏱ ${line}` : undefined;
   }
 
   const lastReply = messages.data?.filter((m) => m.role === 'assistant').at(-1);
@@ -188,6 +212,7 @@ export default function ChatScreen() {
             renderItem={({ item }) => (
               <MessageBubble
                 message={item}
+                timing={SHOW_TIMINGS ? timingLine(item) : undefined}
                 onTapSegment={item.id === 'pending' || readOnly ? undefined : onTapSegment}
                 onPlay={speak}
               />
@@ -247,7 +272,10 @@ export default function ChatScreen() {
             ) : (
               <MicButton
                 disabled={send.isPending || limited || turnCapped}
-                onTranscript={(text) => setDraft((d) => (d ? `${d} ${text}` : text))}
+                onTranscript={(text, ms) => {
+                  heardMs.current = ms;
+                  setDraft((d) => (d ? `${d} ${text}` : text));
+                }}
               />
             )}
           </View>

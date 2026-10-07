@@ -32,7 +32,8 @@ const RECORDING: RecordingOptions = {
 
 const MIN_RECORDING_MS = 400;
 
-type Props = { disabled?: boolean; onTranscript: (text: string) => void };
+// onTranscript gets how long recognition took after the button was released, in ms.
+type Props = { disabled?: boolean; onTranscript: (text: string, ms: number) => void };
 
 // F14: hold to talk. The transcript goes into the text box for the learner to
 // check before sending, because recognition of learner Cantonese is error-prone.
@@ -57,6 +58,7 @@ export function MicButton({ disabled, onTranscript }: Props) {
 
   async function stop() {
     if (state !== 'recording') return;
+    const released = Date.now();
     setState('working');
     try {
       await recorder.stop();
@@ -66,7 +68,7 @@ export function MicButton({ disabled, onTranscript }: Props) {
         return;
       }
       const { text } = await transcribe(recorder.uri);
-      if (text) onTranscript(text);
+      if (text) onTranscript(text, Date.now() - released);
       else Alert.alert("Didn't catch that", 'Try again a little closer to the mic.');
     } catch (e) {
       Alert.alert("Couldn't hear that", (e as Error).message);
